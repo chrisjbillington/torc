@@ -22,6 +22,9 @@ which uses pyqtgraph/OpenGL.
 import numpy as np
 from scipy.special import ellipk, ellipe
 from scipy.constants import mu_0
+import pyqtgraph as pg
+import pyqtgraph.opengl as gl
+from pyqtgraph.Qt import QtGui
 
 #: Millimetres — multiply by this to convert mm to metres.
 mm = 1e-3
@@ -490,10 +493,6 @@ class CurrentObject(object):
                 ``False``.
             color (tuple): RGB colour as a 3-tuple of floats in ``[0, 1]``.
                 Defaults to :data:`COPPER`."""
-        import pyqtgraph as pg
-        import pyqtgraph.opengl as gl
-        from pyqtgraph.Qt import QtCore, QtGui
-        
         VIEW_WIDTH = 800
         VIEW_HEIGHT = 600
         VIEW_FOV = 30
