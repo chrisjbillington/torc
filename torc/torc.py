@@ -1,3 +1,24 @@
+"""Magnetic field and gradient calculations for current-carrying coils.
+
+This module provides classes for computing the magnetic field produced by
+current-carrying conductors of various geometries — loops, straight wires, arcs,
+round coils, racetrack coils, and arbitrary combinations thereof — positioned and
+oriented anywhere in 3D space.
+
+Finite cross-section conductors (e.g. :class:`RoundCoil`, :class:`RacetrackCoil`)
+are approximated by distributing multiple idealised 1D current elements through
+the cross-section. Loop fields are computed analytically using complete elliptic
+integrals; straight wire fields use the Biot–Savart result for a finite wire; arcs
+and curved segments are approximated as sequences of straight segments.
+
+All quantities are in SI units: positions in metres, currents in amps, and fields
+in tesla. Convenience constants (:data:`mm`, :data:`cm`, :data:`inch`,
+:data:`gauss`, :data:`gauss_per_cm`) are provided for unit conversions.
+
+3D visualisation of coil geometry is available via :meth:`CurrentObject.show`,
+which uses pyqtgraph/OpenGL.
+"""
+
 import numpy as np
 from scipy.special import ellipk, ellipe
 from scipy.constants import mu_0
