@@ -906,26 +906,29 @@ class StraightSegment(Container):
         """A straight conductor segment with rectangular cross-section.
 
         Current flows from r0 to r1. The cross-section is oriented by the vector n
-        (perpendicular to the current direction): width is measured along n, and
-        height in the remaining direction. The finite cross-section is approximated
-        by distributing cross_sec_segs idealised :class:`Line` elements evenly
-        through the rectangular cross-section.
+        (perpendicular to the current direction), which defines the direction along
+        which ``height`` is measured — consistent with the meaning of n in other
+        classes such as :class:`RoundCoil` and :class:`CurvedSegment`. ``width``
+        is the extent in the remaining transverse direction. The finite
+        cross-section is approximated by distributing cross_sec_segs idealised
+        :class:`Line` elements evenly through the rectangular cross-section.
 
         Args:
             r0 (tuple or array-like): Start position ``(x, y, z)`` (metres).
             r1 (tuple or array-like): End position ``(x, y, z)`` (metres).
             n (tuple or array-like): A direction perpendicular to the current flow,
-                defining the width direction of the cross-section.
-            width (float): Extent of the cross-section along n (metres).
-            height (float): Extent of the cross-section in the remaining direction
-                (metres).
+                defining the height direction of the cross-section.
+            width (float): Extent of the cross-section perpendicular to both the
+                current direction and n (metres).
+            height (float): Extent of the cross-section along n (metres).
             n_turns (float): Overall current multiplier. Defaults to 1.
             cross_sec_segs (int): Number of :class:`Line` elements used to
                 approximate the finite cross-section. Defaults to 12.
             name (str, optional): Identifying name for :class:`Container` lookup."""
         r0 = np.array(r0, dtype=float)
         r1 = np.array(r1, dtype=float)
-        super().__init__(r0=r0, zprime=r1 - r0, xprime=n, n_turns=n_turns, name=name)
+        xprime = np.cross(n, r1 - r0)
+        super().__init__(r0=r0, zprime=r1 - r0, xprime=xprime, n_turns=n_turns, name=name)
         self.width = width
         self.height = height
         self.L = np.sqrt(((np.array(r1) - np.array(r0)) ** 2).sum())
@@ -1116,7 +1119,7 @@ class RacetrackCoil(Container):
                     StraightSegment(
                         self.pos_to_lab((xprime0, yprime, 0)),
                         self.pos_to_lab((xprime1, yprime, 0)),
-                        self.vector_to_lab((0, 1, 0)),
+                        self.vector_to_lab((0, 0, 1)),
                         self.R_outer - self.R_inner,
                         self.height,
                         n_turns=n_turns,
@@ -1136,7 +1139,7 @@ class RacetrackCoil(Container):
                     StraightSegment(
                         self.pos_to_lab((xprime, yprime0, 0)),
                         self.pos_to_lab((xprime, yprime1, 0)),
-                        self.vector_to_lab((1, 0, 0)),
+                        self.vector_to_lab((0, 0, 1)),
                         self.R_outer - self.R_inner,
                         self.height,
                         n_turns=n_turns,
