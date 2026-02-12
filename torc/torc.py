@@ -215,29 +215,29 @@ def _linear_to_srgb(c):
 
 
 def _reinhard_luminance_tonemap(rgb_linear):
-    """Compress HDR linear RGB to [0,1] via Reinhard, preserving hue."""
+    """Compress HDR linear RGB rgb_linear, shape (..., 3) to [0,1] via Reinhard,
+    preserving hue."""
     BT709_LUMINANCE = np.array([0.2126, 0.7152, 0.0722])
     lum = rgb_linear @ BT709_LUMINANCE
     mapped = lum / (1 + lum)
-    return rgb_linear * (mapped / (lum + 1e-12))[:, np.newaxis]
+    return rgb_linear * (mapped / (lum + 1e-12))[..., np.newaxis]
 
 
-def _do_shading(verts, faces, color, r_light=(1,2,3), ambient=0.1):
+def _do_shading_normals(normals, color, r_light=(1,2,3), ambient=0.1):
     # Return shaded RGBA colours (as floats 0–1, with alpha always 1) for each face
     # based on angle to a fixed light source verts: n×3 array of points specifying x,y,z
     # coords of a list of vertices faces: m×3 array of indices into verts specifying a
     # list of triangles. Color should be a 3-tuple of floats 0–1.
+
+    # normals should have vector dimension last, can have arbitrary other dimensions
+
+    normals /= np.linalg.norm(normals, axis=-1, keepdims=True) + 1e-12
 
     r_light = _unit(r_light)
 
     # Compute intensity for angle, such that average intensity over all angles is 1.0 +
     # ambient:
     AVG_ILLUMINATION = 2 / np.pi
-
-    # face normals via cross product of triangle edges
-    v0, v1, v2 = verts[faces[:, 0]], verts[faces[:, 1]], verts[faces[:, 2]]
-    normals = np.cross(v1 - v0, v2 - v0)
-    normals /= np.linalg.norm(normals, axis=1, keepdims=True) + 1e-12
 
     intensity = np.abs(normals @ r_light) / AVG_ILLUMINATION
 
@@ -246,12 +246,34 @@ def _do_shading(verts, faces, color, r_light=(1,2,3), ambient=0.1):
 
     # Convert desired colour to linear colour space, apply intensity factor, tone map to
     # displayable range, then convert back to SRGB:
-    hdr_linear = intensity[:, np.newaxis] * _srgb_to_linear(color)
+    hdr_linear = intensity[..., np.newaxis] * _srgb_to_linear(color)
     ldr_linear = _reinhard_luminance_tonemap(hdr_linear)
     face_colors_srgb = _linear_to_srgb(ldr_linear)
 
-    face_colors = np.column_stack([face_colors_srgb, np.ones(len(faces))])
+    # Extend to RGBA    
+    face_colors = np.concat(
+        [face_colors_srgb, np.ones_like(face_colors_srgb[..., :1])], axis=-1
+    )
     return face_colors
+
+
+def _do_shading_mesh(mesh, color, r_light=(1, 2, 3), ambient=0.1):
+    mesh = mesh.transpose((1, 2, 0))
+    # Corners of quads
+    r0 = mesh[:-1, :-1]
+    r1 = mesh[1:, :-1]
+    r2 = mesh[1:, 1:]
+    r3 = mesh[:-1, 1:]
+    # cross product of diagonals:
+    normals = np.cross(r2 - r0, r3 - r1)
+    return _do_shading_normals(normals, color, r_light=r_light, ambient=ambient)
+
+
+def _do_shading_triangles(verts, faces, color, r_light=(1, 2, 3), ambient=0.1):
+    # face normals via cross product of triangle edges
+    v0, v1, v2 = verts[faces[:, 0]], verts[faces[:, 1]], verts[faces[:, 2]]
+    normals = np.cross(v1 - v0, v2 - v0)
+    return _do_shading_normals(normals, color, r_light=r_light, ambient=ambient)
 
 
 class CurrentObject(object):
@@ -536,7 +558,7 @@ class CurrentObject(object):
                 mesh = gl.GLMeshItem(
                     vertexes=verts,
                     faces=faces,
-                    faceColors=_do_shading(verts, faces, color),
+                    faceColors=_do_shading_triangles(verts, faces, color),
                     smooth=False,
                     computeNormals=False,
                 )
