@@ -255,14 +255,17 @@ class CurrentObject(object):
 
     @property
     def x(self):
+        """The x coordinate of the object's centre position in the lab frame."""
         return self.r0[0]
 
     @property
     def y(self):
+        """The y coordinate of the object's centre position in the lab frame."""
         return self.r0[1]
 
     @property
     def z(self):
+        """The z coordinate of the object's centre position in the lab frame."""
         return self.r0[2]
 
     def pos_to_local(self, r):
@@ -300,6 +303,9 @@ class CurrentObject(object):
         return self.vector_to_lab(self.B_local(rprime, I * self.n_turns))
 
     def B_local(self, rprime, I):
+        """Compute the magnetic field in the local coordinate frame. Subclasses
+        override this to provide the actual field calculation. The base class
+        implementation returns zero."""
         return np.zeros_like(rprime)
 
     def dB(self, r, I, s, ds=10e-6):
@@ -322,15 +328,26 @@ class CurrentObject(object):
         return (self.B(rp, I) - self.B(rm, I)) / (2 * ds)
 
     def surfaces(self):
+        """Return a list of 3D surface meshes in lab coordinates for visualisation.
+        Each element is a tuple ``(x, y, z)`` of 2D arrays suitable for mesh
+        rendering."""
         return [self.pos_to_lab(pts) for pts in self.local_surfaces()]
 
     def lines(self):
+        """Return a list of 3D line paths in lab coordinates for visualisation.
+        Each element is a tuple ``(x, y, z)`` of 1D arrays tracing the path."""
         return [self.pos_to_lab(pts) for pts in self.local_lines()]
 
     def local_surfaces(self):
+        """Return surface meshes in local coordinates. Subclasses override this to
+        describe their geometry for visualisation. The base class returns an empty
+        list."""
         return []
 
     def local_lines(self):
+        """Return line paths in local coordinates. Subclasses override this to
+        describe their geometry for visualisation. The base class returns an empty
+        list."""
         return []
 
     # def show_mpl(
@@ -363,6 +380,8 @@ class CurrentObject(object):
     #     plt.show()
 
     def show(self, surfaces=True, lines=False, color=COPPER):
+        """Open an interactive 3D pyqtgraph/OpenGL window displaying this object's
+        geometry. The window blocks until closed."""
         import pyqtgraph as pg
         import pyqtgraph.opengl as gl
         from pyqtgraph.Qt import QtCore, QtGui
@@ -471,6 +490,12 @@ class CurrentObject(object):
 
 
 class Container(CurrentObject):
+    """A group of :class:`CurrentObject` instances whose fields are summed.
+
+    Children can be passed at construction or added later with :meth:`add`.
+    Individual children can be accessed by integer index, slice, or by name
+    string."""
+
     def __init__(
         self,
         *children,
@@ -486,6 +511,7 @@ class Container(CurrentObject):
         self.children = list(children)
 
     def add(self, *children):
+        """Add one or more :class:`CurrentObject` instances as children."""
         for child in children:
             self.children.append(child)
 
@@ -519,21 +545,27 @@ class Container(CurrentObject):
         return len(self.children)
 
     def index(self, item):
+        """Return the index of a child object."""
         return self.children.index(item)
 
     def B(self, r, I):
+        """Return the total magnetic field at position r due to all children."""
         Bs = []
         for child in self.children:
             Bs.append(child.B(r, I))
         return sum(Bs)
 
     def surfaces(self):
+        """Return surface meshes from this object and all children, in lab
+        coordinates."""
         surfaces = super().surfaces()
         for child in self.children:
             surfaces.extend(child.surfaces())
         return surfaces
 
     def lines(self):
+        """Return line paths from this object and all children, in lab
+        coordinates."""
         lines = super().lines()
         for child in self.children:
             lines.extend(child.lines())
