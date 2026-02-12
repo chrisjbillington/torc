@@ -1,0 +1,50 @@
+[build-system]
+requires = ["setuptools", "setuptools_scm"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools_scm]
+version_scheme = "release-branch-semver"
+local_scheme = "no-local-version"
+
+[tool.setuptools.packages]
+find = {namespaces = false}
+
+[project]
+name = "torc"
+description = "Magnetic coil field and gradient calculations and display"
+authors = [
+    {name = "Christopher Billington", email = "chrisjbillington@gmail.com"},
+]
+keywords = [
+    "magnetic fields",
+    "magnetic coils",
+    "magneto-optical trap",
+    "atomic physics",
+]
+license = "BSD-2-Clause"
+license-files = ["LICENSE"]
+classifiers = [
+    "Programming Language :: Python :: 3 :: Only",
+]
+requires-python = ">=3.8"
+dependencies = [
+    "setuptools_scm",
+    "numpy",
+    "scipy",
+    "matplotlib", # needed for examples
+    "pyqtgraph",
+    "PySide6",
+    "pyopengl"
+]
+dynamic = ["version"]
+
+[project.readme]
+file = "README.md"
+content-type = "text/markdown"
+
+[project.urls]
+Homepage = "https://github.com/chrisjbillington/torc"
+Documentation = "https://github.com/chrisjbillington/torc"
+Repository = "https://github.com/chrisjbillington/torc"
+Downloads = "https://pypi.org/project/torc/"
+Tracker = "https://github.com/chrisjbillington/torc/issues"
