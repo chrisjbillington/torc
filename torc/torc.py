@@ -409,7 +409,6 @@ class CurrentObject(object):
         Returns:
             numpy.ndarray: Magnetic field ``(Bx, By, Bz)`` in the lab frame
             (tesla)."""
-        # r = _broadcast(r)
         rprime = self._pos_to_local(r)
         return self._vector_to_lab(self._B_local(rprime, I * self.n_turns))
 
@@ -461,13 +460,13 @@ class CurrentObject(object):
 
     def surfaces(self):
         """Return a list of 3D surface meshes in lab coordinates for visualisation.
-        Each element is a tuple ``(x, y, z)`` of 2D arrays suitable for mesh
+        Each element is an array of shape ``(3, m, n)`` suitable for mesh
         rendering."""
         return [self._pos_to_lab(pts) for pts in self._local_surfaces()]
 
     def lines(self):
         """Return a list of 3D line paths in lab coordinates for visualisation.
-        Each element is a tuple ``(x, y, z)`` of 1D arrays tracing the path."""
+        Each element is an array of shape ``(3, n)``."""
         return [self._pos_to_lab(pts) for pts in self._local_lines()]
 
     def _local_surfaces(self):
@@ -757,8 +756,8 @@ class Loop(CurrentObject):
         theta = np.linspace(-np.pi, np.pi, 361)
         xprime = self.R * np.cos(theta)
         yprime = self.R * np.sin(theta)
-        zprime = 0
-        return [(xprime, yprime, zprime)]
+        zprime = np.zeros_like(theta)
+        return [np.array([xprime, yprime, zprime])]
 
 
 class Line(CurrentObject):
@@ -803,8 +802,8 @@ class Line(CurrentObject):
 
     def _local_lines(self):
         zprime = np.array([-self.L / 2, self.L / 2], dtype=float)
-        xprime = yprime = 0
-        return [(xprime, yprime, zprime)]
+        xprime = yprime = np.zeros_like(zprime)
+        return [np.array([xprime, yprime, zprime])]
 
 
 class Arc(Container):
@@ -864,8 +863,8 @@ class Arc(Container):
         theta = np.linspace(self.phi_0, self.phi_1, n_theta)
         xprime = self.R * np.cos(theta)
         yprime = self.R * np.sin(theta)
-        zprime = 0
-        return [(xprime, yprime, zprime)]
+        zprime = np.zeros_like(theta)
+        return [np.array([xprime, yprime, zprime])]
 
 
 class RoundCoil(Container):
@@ -924,7 +923,7 @@ class RoundCoil(Container):
         )
         xprime = r * np.cos(theta)
         yprime = r * np.sin(theta)
-        return [(xprime, yprime, zprime)]
+        return [np.array([xprime, yprime, zprime])]
 
 
 class StraightSegment(Container):
@@ -993,7 +992,7 @@ class StraightSegment(Container):
             self.L / 2,
             2,
         )
-        return [(xprime, yprime, zprime)]
+        return [np.array([xprime, yprime, zprime])]
 
 
 class CurvedSegment(Container):
@@ -1069,7 +1068,7 @@ class CurvedSegment(Container):
         )
         xprime = r * np.cos(theta)
         yprime = r * np.sin(theta)
-        return [(xprime, yprime, zprime)]
+        return [np.array([xprime, yprime, zprime])]
 
 
 class RacetrackCoil(Container):
