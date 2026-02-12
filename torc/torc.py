@@ -25,20 +25,27 @@ from scipy.constants import mu_0
 
 pi = np.pi
 
-# units
+#: Millimetres — multiply by this to convert mm to metres.
 mm = 1e-3
+#: Inches — multiply by this to convert inches to metres.
 inch = 25.4 * mm
+#: Centimetres — multiply by this to convert cm to metres.
 cm = 1e-2
+#: Gauss — multiply by this to convert gauss to tesla.
 gauss = 1e-4
+#: Gauss per centimetre — multiply by this to convert gauss/cm to tesla/metre.
 gauss_per_cm = gauss / cm
 
-# Colours:
+#: RGB colour tuple for copper, for use with :meth:`CurrentObject.show`.
 COPPER = (0.722, 0.451, 0.200)
+#: RGB colour tuple for silver, for use with :meth:`CurrentObject.show`.
 SILVER = (0.75, 0.75, 0.75)
 
-# Unit vectors:
+#: Unit vector in the x direction.
 X = (1, 0, 0)
+#: Unit vector in the y direction.
 Y = (0, 1, 0)
+#: Unit vector in the z direction.
 Z = (0, 0, 1)
 
 
