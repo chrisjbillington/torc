@@ -548,7 +548,7 @@ class Line(CurrentObject):
         self.L = np.sqrt(((np.array(r1) - np.array(r0)) ** 2).sum())
 
     def B_local(self, rprime, I):
-        """Field due to the loop at position rprime=(xprime, yprime, zprime) for current
+        """Field due to the line at position rprime=(xprime, yprime, zprime) for current
         I"""
         xprime, yprime, zprime = rprime
         # Expression we need to call is in cylindrical coordinates:
@@ -579,11 +579,11 @@ class Arc(Container):
         name=None,
     ):
         """Current arc forming part of a loop centred at r0 with normal vector n, from
-        angle theta_0 to theta_1 defined with respect to the direction n_perp, which
+        angle phi_0 to phi_1 defined with respect to the direction n_perp, which
         should be a direction perpendicular to n. Current is flowing from phi_0 to
         phi_1, which if phi_0 < phi_1, is in the positive sense with respect to the
-        normal direction n. This arc is constructed out of n_seg separate line segments,
-        so the accuracy can be increased by increasing n_seg."""
+        normal direction n. This arc is constructed out of n_segs separate line
+        segments, so the accuracy can be increased by increasing n_segs."""
         super().__init__(r0=r0, zprime=n, xprime=n_perp, n_turns=n_turns, name=name)
         self.R = R
         self.phi_0 = phi_0
@@ -724,7 +724,7 @@ class CurvedSegment(Container):
     ):
 
         """Rounded segment of conductor with rectangular cross section, forming part of
-        a round coil centred at r0 with normal vector n, from angle theta_0 to theta_1
+        a round coil centred at r0 with normal vector n, from angle phi_0 to phi_1
         defined with respect to the direction n_perp, which should be a direction
         perpendicular to n. Current is flowing from phi_0 to phi_1, which if phi_0 <
         phi_1, is in the positive sense with respect to the normal direction n. The
@@ -863,7 +863,7 @@ class RacetrackCoil(Container):
 class CoilPair(Container):
     def __init__(self, coiltype, r0, n, displacement, *args, **kwargs):
         """A pair of coils of the given type (any class accepting r0 and n as its first
-        instantion arguments) centred on r0. One coil is at (r0 + displacement * n) and
+        instantiation arguments) centred on r0. One coil is at (r0 + displacement * n) and
         has normal vector n, and the other is at (r0 - displacement * n). The second
         coil has normal vector n if parity is 1 or the string 'helmholtz', and  has
         normal vector -n if parity is -1 or the string 'anti-helmholtz'. Remaining
