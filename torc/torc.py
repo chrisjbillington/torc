@@ -730,18 +730,22 @@ class Loop(CurrentObject):
 
 
 class Line(CurrentObject):
-    def __init__(self, r0, r1, n_turns=1, name=None):
+    def __init__(self, r_start, r_end, n_turns=1, name=None):
         """A straight current-carrying wire segment.
 
-        Current flows from r0 to r1.
+        Current flows from r_start to r_end. The object's centre (:attr:`r0`) is
+        the midpoint of the wire.
 
         Args:
-            r0 (tuple or array-like): Start position ``(x, y, z)`` (metres).
-            r1 (tuple or array-like): End position ``(x, y, z)`` (metres).
+            r_start (tuple or array-like): Start position ``(x, y, z)`` (metres).
+            r_end (tuple or array-like): End position ``(x, y, z)`` (metres).
             n_turns (float): Overall current multiplier. Defaults to 1.
             name (str, optional): Identifying name for :class:`Container` lookup."""
-        zprime = np.array(r1) - np.array(r0)
-        super().__init__(r0=r0, zprime=zprime, n_turns=n_turns, name=name)
+        r_start = np.array(r_start, dtype=float)
+        r_end = np.array(r_end, dtype=float)
+        zprime = r_end - r_start
+        midpoint = (r_start + r_end) / 2
+        super().__init__(r0=midpoint, zprime=zprime, n_turns=n_turns, name=name)
         self.L = np.linalg.norm(zprime)
 
     def B_local(self, rprime, I):
@@ -755,16 +759,18 @@ class Line(CurrentObject):
         Returns:
             numpy.ndarray: Field ``(Bxprime, Byprime, Bzprime)`` (tesla)."""
         xprime, yprime, zprime = rprime
-        # Expression we need to call is in cylindrical coordinates:
+        # Expression we need to call is in cylindrical coordinates.
+        # field_of_current_line expects a wire from z=0 to z=L, but our local
+        # frame is centred at the midpoint, so shift by L/2:
         rho = np.sqrt(xprime ** 2 + yprime ** 2)
-        B_phi = field_of_current_line(rho, zprime, self.L, I)
+        B_phi = field_of_current_line(rho, zprime + self.L / 2, self.L, I)
         phi = np.arctan2(yprime, xprime)
         B_xprime = -B_phi * np.sin(phi)
         B_yprime = B_phi * np.cos(phi)
         return np.array([B_xprime, B_yprime, np.zeros_like(B_xprime)])
 
     def local_lines(self):
-        zprime = np.array([0, self.L], dtype=float)
+        zprime = np.array([-self.L / 2, self.L / 2], dtype=float)
         xprime = yprime = 0
         return [(xprime, yprime, zprime)]
 
@@ -817,9 +823,9 @@ class Arc(Container):
             xprime1 = R * np.cos(phi_seg_stop)
             yprime1 = R * np.sin(phi_seg_stop)
 
-            r0_seg = self.pos_to_lab((xprime0, yprime0, 0))
-            r1_seg = self.pos_to_lab((xprime1, yprime1, 0))
-            self.add(Line(r0_seg, r1_seg, n_turns=n_turns))
+            r_start_seg = self.pos_to_lab((xprime0, yprime0, 0))
+            r_end_seg = self.pos_to_lab((xprime1, yprime1, 0))
+            self.add(Line(r_start_seg, r_end_seg, n_turns=n_turns))
 
     def local_lines(self):
         n_theta = int(round((self.phi_1 - self.phi_0) * 180 / np.pi)) + 1  # every 1 degree
@@ -892,8 +898,8 @@ class RoundCoil(Container):
 class StraightSegment(Container):
     def __init__(
         self,
-        r0,
-        r1,
+        r_start,
+        r_end,
         n,
         width,
         height,
@@ -903,7 +909,8 @@ class StraightSegment(Container):
     ):
         """A straight conductor segment with rectangular cross-section.
 
-        Current flows from r0 to r1. The cross-section is oriented by the vector n
+        Current flows from r_start to r_end. The object's centre (:attr:`r0`) is
+        the midpoint of the segment. The cross-section is oriented by the vector n
         (perpendicular to the current direction), which defines the direction along
         which ``height`` is measured — consistent with the meaning of n in other
         classes such as :class:`RoundCoil` and :class:`CurvedSegment`. ``width``
@@ -912,8 +919,8 @@ class StraightSegment(Container):
         :class:`Line` elements evenly through the rectangular cross-section.
 
         Args:
-            r0 (tuple or array-like): Start position ``(x, y, z)`` (metres).
-            r1 (tuple or array-like): End position ``(x, y, z)`` (metres).
+            r_start (tuple or array-like): Start position ``(x, y, z)`` (metres).
+            r_end (tuple or array-like): End position ``(x, y, z)`` (metres).
             n (tuple or array-like): A direction perpendicular to the current flow,
                 defining the height direction of the cross-section.
             width (float): Extent of the cross-section perpendicular to both the
@@ -923,11 +930,14 @@ class StraightSegment(Container):
             cross_sec_segs (int): Number of :class:`Line` elements used to
                 approximate the finite cross-section. Defaults to 12.
             name (str, optional): Identifying name for :class:`Container` lookup."""
-        r0 = np.array(r0, dtype=float)
-        r1 = np.array(r1, dtype=float)
-        zprime = r1 - r0
+        r_start = np.array(r_start, dtype=float)
+        r_end = np.array(r_end, dtype=float)
+        zprime = r_end - r_start
+        midpoint = (r_start + r_end) / 2
         xprime = np.cross(n, zprime)
-        super().__init__(r0=r0, zprime=zprime, xprime=xprime, n_turns=n_turns, name=name)
+        super().__init__(
+            r0=midpoint, zprime=zprime, xprime=xprime, n_turns=n_turns, name=name
+        )
         self.width = width
         self.height = height
         self.L = np.linalg.norm(zprime)
@@ -935,9 +945,9 @@ class StraightSegment(Container):
         n_turns_per_seg = self.n_turns / cross_sec_segs
         segs = _segments(-width / 2, width / 2, -height / 2, height / 2, cross_sec_segs)
         for xprime, yprime in segs:
-            r0_line = self.pos_to_lab((xprime, yprime, 0))
-            r1_line = self.pos_to_lab((xprime, yprime, self.L))
-            self.add(Line(r0_line, r1_line, n_turns=n_turns_per_seg))
+            r_start_line = self.pos_to_lab((xprime, yprime, -self.L / 2))
+            r_end_line = self.pos_to_lab((xprime, yprime, self.L / 2))
+            self.add(Line(r_start_line, r_end_line, n_turns=n_turns_per_seg))
 
     def local_surfaces(self):
         # Create arrays (in local coordinates) describing surfaces of the segment for
@@ -947,8 +957,8 @@ class StraightSegment(Container):
             self.width / 2,
             -self.height / 2,
             self.height / 2,
-            0,
-            self.L,
+            -self.L / 2,
+            self.L / 2,
             2,
         )
         return [(xprime, yprime, zprime)]
