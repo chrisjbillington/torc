@@ -58,6 +58,12 @@ def _formatobj(obj, *attrnames):
     return f"<{obj.__class__.__name__}({attrs}) at {hex(id(obj))}>"
 
 
+def _unit(v):
+    """Return v as a unit-length numpy array."""
+    v = np.asarray(v, dtype=float)
+    return v / np.linalg.norm(v)
+
+
 def _get_factors(n):
     """return all the factors of n"""
     factors = set()
@@ -219,8 +225,7 @@ def _do_shading(verts, faces, color, r_light=(1,2,3), ambient=0.1):
     # coords of a list of vertices faces: m×3 array of indices into verts specifying a
     # list of triangles. Color should be a 3-tuple of floats 0–1.
 
-    r_light = np.array(r_light, dtype=float)
-    r_light /= np.linalg.norm(r_light)
+    r_light = _unit(r_light)
 
     # Compute intensity for angle, such that average intensity over all angles is 1.0 +
     # ambient:
@@ -269,11 +274,11 @@ class CurrentObject(object):
             name (str, optional): An identifying name, used for lookup in a
                 :class:`Container`."""
         self.r0 = np.array(r0)
-        self.zprime = np.array(zprime) / np.sqrt(np.dot(zprime, zprime))
+        self.zprime = _unit(zprime)
         if xprime is None:
             # A random vector that is orthogonal to zprime:
             xprime = _cross(np.random.randn(3), zprime)
-        self.xprime = np.array(xprime) / np.sqrt(np.dot(xprime, xprime))
+        self.xprime = _unit(xprime)
 
         if not abs(np.dot(self.xprime, self.zprime)) < 1e-10:
             raise ValueError("Primary and secondary axes of object not orthogonal")
@@ -416,8 +421,7 @@ class CurrentObject(object):
                 s = {'x': X, 'y': Y, 'z': Z}[s]
             except KeyError:
                 raise KeyError("s must be one of 'x', 'y', 'z' or a vector") from None
-        s = np.array(s, dtype=float)
-        s /= np.sqrt(np.dot(s, s))
+        s = _unit(s)
         r = _broadcast(r)
         rp = ((r.T) + s * ds).T
         rm = ((r.T) - s * ds).T
