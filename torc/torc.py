@@ -23,8 +23,6 @@ import numpy as np
 from scipy.special import ellipk, ellipe
 from scipy.constants import mu_0
 
-pi = np.pi
-
 #: Millimetres — multiply by this to convert mm to metres.
 mm = 1e-3
 #: Inches — multiply by this to convert inches to metres.
@@ -147,7 +145,7 @@ def field_of_current_loop(r, z, R, I):
     rprime2 = z ** 2 + (r - R) ** 2
 
     B_r_num = mu_0 * z * I * ((R ** 2 + z ** 2 + r ** 2) / rprime2 * E_k2 - K_k2)
-    B_r_denom = 2 * pi * r * np.sqrt(z ** 2 + (R + r) ** 2)
+    B_r_denom = 2 * np.pi * r * np.sqrt(z ** 2 + (R + r) ** 2)
 
     # Some hoop jumping to set B_r = 0 when r = 0 despite the expression having a
     # division by zero in it in when r = 0:
@@ -160,7 +158,7 @@ def field_of_current_loop(r, z, R, I):
         B_r = B_r_num / B_r_denom
 
     B_z_num = mu_0 * I * ((R ** 2 - z ** 2 - r ** 2) / rprime2 * E_k2 + K_k2)
-    B_z_denom = 2 * pi * np.sqrt(z ** 2 + (R + r) ** 2)
+    B_z_denom = 2 * np.pi * np.sqrt(z ** 2 + (R + r) ** 2)
 
     B_z = B_z_num / B_z_denom
 
@@ -182,7 +180,7 @@ def field_of_current_line(r, z, L, I):
 
     Returns:
         float or numpy.ndarray: Azimuthal field component B_phi (tesla)."""
-    prefactor = mu_0 * I / (4 * pi * r)
+    prefactor = mu_0 * I / (4 * np.pi * r)
     term1 = z / np.sqrt(r ** 2 + z ** 2)
     term2 = (L - z) / np.sqrt(r ** 2 + (L - z) ** 2)
     return prefactor * (term1 + term2)
@@ -415,7 +413,7 @@ class CurrentObject(object):
             per metre)."""
         if isinstance(s, str):
             try:
-                s = {'x': (1, 0, 0), 'y': (0, 1, 0), 'z': (0, 0, 1)}[s]
+                s = {'x': X, 'y': Y, 'z': Z}[s]
             except KeyError:
                 raise KeyError("s must be one of 'x', 'y', 'z' or a vector") from None
         s = np.array(s, dtype=float)
@@ -580,7 +578,7 @@ class CurrentObject(object):
         view.setCameraParams(elevation=30, azimuth=-60)
 
         view.opts['center'] = pg.Vector(*r0)
-        theta_fov = VIEW_FOV * pi / 180
+        theta_fov = VIEW_FOV * np.pi / 180
         view.opts['distance'] = (
             max(VIEW_WIDTH / VIEW_HEIGHT, 1) * rmax / np.tan(theta_fov / 2)
         )
@@ -606,7 +604,7 @@ class Container(CurrentObject):
         self,
         *children,
         r0=(0, 0, 0),
-        zprime=(0, 0, 1),
+        zprime=Z,
         xprime=None,
         n_turns=1,
         name=None,
@@ -724,7 +722,7 @@ class Loop(CurrentObject):
         return np.array([B_xprime, B_yprime, B_zprime])
 
     def local_lines(self):
-        theta = np.linspace(-pi, pi, 361)
+        theta = np.linspace(-np.pi, np.pi, 361)
         xprime = self.R * np.cos(theta)
         yprime = self.R * np.sin(theta)
         zprime = 0
@@ -744,7 +742,7 @@ class Line(CurrentObject):
             name (str, optional): Identifying name for :class:`Container` lookup."""
         zprime = np.array(r1) - np.array(r0)
         super().__init__(r0=r0, zprime=zprime, n_turns=n_turns, name=name)
-        self.L = np.sqrt(((np.array(r1) - np.array(r0)) ** 2).sum())
+        self.L = np.linalg.norm(zprime)
 
     def B_local(self, rprime, I):
         """Compute the magnetic field of this wire in local coordinates.
@@ -824,7 +822,7 @@ class Arc(Container):
             self.add(Line(r0_seg, r1_seg, n_turns=n_turns))
 
     def local_lines(self):
-        n_theta = int(round((self.phi_1 - self.phi_0) * 180 / pi)) + 1  # every 1 degree
+        n_theta = int(round((self.phi_1 - self.phi_0) * 180 / np.pi)) + 1  # every 1 degree
         theta = np.linspace(self.phi_0, self.phi_1, n_theta)
         xprime = self.R * np.cos(theta)
         yprime = self.R * np.sin(theta)
@@ -882,8 +880,8 @@ class RoundCoil(Container):
             self.R_outer,
             -self.height / 2,
             self.height / 2,
-            -pi,
-            pi,
+            -np.pi,
+            np.pi,
             n_theta,
         )
         xprime = r * np.cos(theta)
@@ -927,11 +925,12 @@ class StraightSegment(Container):
             name (str, optional): Identifying name for :class:`Container` lookup."""
         r0 = np.array(r0, dtype=float)
         r1 = np.array(r1, dtype=float)
-        xprime = np.cross(n, r1 - r0)
-        super().__init__(r0=r0, zprime=r1 - r0, xprime=xprime, n_turns=n_turns, name=name)
+        zprime = r1 - r0
+        xprime = np.cross(n, zprime)
+        super().__init__(r0=r0, zprime=zprime, xprime=xprime, n_turns=n_turns, name=name)
         self.width = width
         self.height = height
-        self.L = np.sqrt(((np.array(r1) - np.array(r0)) ** 2).sum())
+        self.L = np.linalg.norm(zprime)
 
         n_turns_per_seg = self.n_turns / cross_sec_segs
         segs = _segments(-width / 2, width / 2, -height / 2, height / 2, cross_sec_segs)
@@ -1016,7 +1015,7 @@ class CurvedSegment(Container):
     def local_surfaces(self):
         # Create arrays (in local coordinates) describing surfaces of the segment for
         # plotting:
-        n_theta = int(round((self.phi_1 - self.phi_0) * 180 / pi)) + 1  # every 1 degree
+        n_theta = int(round((self.phi_1 - self.phi_0) * 180 / np.pi)) + 1  # every 1 degree
         r, zprime, theta = _rectangular_tube(
             self.R_inner,
             self.R_outer,
@@ -1086,10 +1085,10 @@ class RacetrackCoil(Container):
         self.R_inner = R_inner
         self.R_outer = R_outer
         for xprime, yprime, phi_0, phi_1 in [
-            [width / 2 - R_inner, length / 2 - R_inner, 0, pi / 2],
-            [-width / 2 + R_inner, length / 2 - R_inner, pi / 2, pi],
-            [-width / 2 + R_inner, -length / 2 + R_inner, pi, 3 * pi / 2],
-            [width / 2 - R_inner, -length / 2 + R_inner, 3 * pi / 2, 2 * pi],
+            [width / 2 - R_inner, length / 2 - R_inner, 0, np.pi / 2],
+            [-width / 2 + R_inner, length / 2 - R_inner, np.pi / 2, np.pi],
+            [-width / 2 + R_inner, -length / 2 + R_inner, np.pi, 3 * np.pi / 2],
+            [width / 2 - R_inner, -length / 2 + R_inner, 3 * np.pi / 2, 2 * np.pi],
         ]:
             self.add(
                 CurvedSegment(
@@ -1119,7 +1118,7 @@ class RacetrackCoil(Container):
                     StraightSegment(
                         self.pos_to_lab((xprime0, yprime, 0)),
                         self.pos_to_lab((xprime1, yprime, 0)),
-                        self.vector_to_lab((0, 0, 1)),
+                        self.vector_to_lab(Z),
                         self.R_outer - self.R_inner,
                         self.height,
                         n_turns=n_turns,
@@ -1139,7 +1138,7 @@ class RacetrackCoil(Container):
                     StraightSegment(
                         self.pos_to_lab((xprime, yprime0, 0)),
                         self.pos_to_lab((xprime, yprime1, 0)),
-                        self.vector_to_lab((0, 0, 1)),
+                        self.vector_to_lab(Z),
                         self.R_outer - self.R_inner,
                         self.height,
                         n_turns=n_turns,
