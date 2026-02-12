@@ -641,6 +641,7 @@ class Container(CurrentObject):
             for child in self.children:
                 if child.name == key:
                     self.children.remove(child)
+                    return
             raise KeyError(f"no object in container with name {key}")
         else:
             msg = f"""Can only look up objects in container by integer index or string
