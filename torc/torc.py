@@ -4,11 +4,27 @@ from scipy.constants import mu_0
 
 pi = np.pi
 
-import torc
+# units
+mm = 1e-3
+inch = 25.4 * mm
+cm = 1e-2
+gauss = 1e-4
+gauss_per_cm = gauss / cm
+
+# Colours:
+COPPER = (0.722, 0.451, 0.200)
+SILVER = (0.75, 0.75, 0.75)
+
+# Unit vectors:
+X = (1, 0, 0)
+Y = (0, 1, 0)
+Z = (0, 0, 1)
 
 
-DEFAULT_ARC_SEGS = 12
-DEFAULT_CROSS_SEC_SEGS = 12
+# Default discretisation parameters:
+_DEFAULT_ARC_SEGS = 12
+_DEFAULT_CROSS_SEC_SEGS = 12
+
 
 def _formatobj(obj, *attrnames):
     """Format an object and some attributes for printing"""
@@ -289,36 +305,36 @@ class CurrentObject(object):
     def local_lines(self):
         return []
 
-    def show_mpl(
-        self, surfaces=True, lines=False, color=torc.COPPER, **kwargs
-    ):
-        from mpl_toolkits import mplot3d
-        import matplotlib.pyplot as plt
+    # def show_mpl(
+    #     self, surfaces=True, lines=False, color=COPPER, **kwargs
+    # ):
+    #     from mpl_toolkits import mplot3d
+    #     import matplotlib.pyplot as plt
 
-        ax = plt.axes(projection='3d')
+    #     ax = plt.axes(projection='3d')
 
-        # Aspect ratio
-        asp_x, asp_y, asp_z = 0, 0, 0
+    #     # Aspect ratio
+    #     asp_x, asp_y, asp_z = 0, 0, 0
 
-        if surfaces:
-            surfaces = self.surfaces()
-            for x, y, z in surfaces:
-                ax.plot_surface(x, y, z, color=color, **kwargs)
-                asp_x = max(asp_x, np.ptp(x))
-                asp_y = max(asp_y, np.ptp(y))
-                asp_z = max(asp_z, np.ptp(z))
-        if lines:
-            lines = self.lines()
-            for x, y, z in lines:
-                ax.plot3D(x, y, z, color=color, **kwargs)
-                asp_x = max(asp_x, np.ptp(x))
-                asp_y = max(asp_y, np.ptp(y))
-                asp_z = max(asp_z, np.ptp(z))
+    #     if surfaces:
+    #         surfaces = self.surfaces()
+    #         for x, y, z in surfaces:
+    #             ax.plot_surface(x, y, z, color=color, **kwargs)
+    #             asp_x = max(asp_x, np.ptp(x))
+    #             asp_y = max(asp_y, np.ptp(y))
+    #             asp_z = max(asp_z, np.ptp(z))
+    #     if lines:
+    #         lines = self.lines()
+    #         for x, y, z in lines:
+    #             ax.plot3D(x, y, z, color=color, **kwargs)
+    #             asp_x = max(asp_x, np.ptp(x))
+    #             asp_y = max(asp_y, np.ptp(y))
+    #             asp_z = max(asp_z, np.ptp(z))
                 
-        ax.set_box_aspect((asp_x, asp_y, asp_z))
-        plt.show()
+    #     ax.set_box_aspect((asp_x, asp_y, asp_z))
+    #     plt.show()
 
-    def show(self, surfaces=True, lines=False, color=torc.COPPER):
+    def show(self, surfaces=True, lines=False, color=COPPER):
         import pyqtgraph as pg
         import pyqtgraph.opengl as gl
         from pyqtgraph.Qt import QtCore, QtGui
@@ -559,7 +575,7 @@ class Arc(Container):
         phi_0,
         phi_1,
         n_turns=1,
-        n_segs=DEFAULT_ARC_SEGS,
+        n_segs=_DEFAULT_ARC_SEGS,
         name=None,
     ):
         """Current arc forming part of a loop centred at r0 with normal vector n, from
@@ -604,7 +620,7 @@ class RoundCoil(Container):
         R_outer,
         height,
         n_turns=1,
-        cross_sec_segs=DEFAULT_CROSS_SEC_SEGS,
+        cross_sec_segs=_DEFAULT_CROSS_SEC_SEGS,
         name=None,
     ):
         """A round loop of conductor with rectangular cross section, centred at r0 with
@@ -651,7 +667,7 @@ class StraightSegment(Container):
         width,
         height,
         n_turns=1,
-        cross_sec_segs=DEFAULT_CROSS_SEC_SEGS,
+        cross_sec_segs=_DEFAULT_CROSS_SEC_SEGS,
         name=None,
     ):
         """A straight segment of conductor, with current flowing in a rectangular cross
@@ -702,8 +718,8 @@ class CurvedSegment(Container):
         phi_0,
         phi_1,
         n_turns=1,
-        cross_sec_segs=DEFAULT_CROSS_SEC_SEGS,
-        arc_segs=DEFAULT_ARC_SEGS,
+        cross_sec_segs=_DEFAULT_CROSS_SEC_SEGS,
+        arc_segs=_DEFAULT_ARC_SEGS,
         name=None,
     ):
 
@@ -759,8 +775,8 @@ class RacetrackCoil(Container):
         R_inner,
         R_outer,
         n_turns=1,
-        arc_segs=DEFAULT_ARC_SEGS,
-        cross_sec_segs=DEFAULT_CROSS_SEC_SEGS,
+        arc_segs=_DEFAULT_ARC_SEGS,
+        cross_sec_segs=_DEFAULT_CROSS_SEC_SEGS,
         name=None,
     ):
         """A rectangular cross section coil comprising four straight segments and four

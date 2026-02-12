@@ -1,8 +1,6 @@
 # Path manipulation to ensure the example can run from the project directory:
 import sys
 import pathlib
-path = sys.path.insert(0, str(pathlib.Path(__file__).absolute().parent.parent))
-
 
 from torc import (
     RacetrackCoil,
