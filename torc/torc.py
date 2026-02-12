@@ -130,6 +130,57 @@ def _cross(a, b):
     return np.array([x, y, z])
 
 
+def _srgb_to_linear(c):
+    c = np.asarray(c)
+    return np.where(c <= 0.04045, c / 12.92, ((c + 0.055) / 1.055) ** 2.4)
+
+
+def _linear_to_srgb(c):
+    c = np.asarray(c)
+    return np.where(c <= 0.0031308, 12.92 * c, 1.055 * c ** (1 / 2.4) - 0.055)
+
+
+def _reinhard_luminance_tonemap(rgb_linear):
+    """Compress HDR linear RGB to [0,1] via Reinhard, preserving hue."""
+    BT709_LUMINANCE = np.array([0.2126, 0.7152, 0.0722])
+    lum = rgb_linear @ BT709_LUMINANCE
+    mapped = lum / (1 + lum)
+    return rgb_linear * (mapped / (lum + 1e-12))[:, np.newaxis]
+
+
+def _do_shading(verts, faces, color, r_light=(1,2,3), ambient=0.1):
+    # Return shaded RGBA colours (as floats 0–1, with alpha always 1) for each face
+    # based on angle to a fixed light source verts: n×3 array of points specifying x,y,z
+    # coords of a list of vertices faces: m×3 array of indices into verts specifying a
+    # list of triangles. Color should be a 3-tuple of floats 0–1.
+
+    r_light = np.array(r_light, dtype=float)
+    r_light /= np.linalg.norm(r_light)
+
+    # Compute intensity for angle, such that average intensity over all angles is 1.0 +
+    # ambient:
+    AVG_ILLUMINATION = 2 / np.pi
+
+    # face normals via cross product of triangle edges
+    v0, v1, v2 = verts[faces[:, 0]], verts[faces[:, 1]], verts[faces[:, 2]]
+    normals = np.cross(v1 - v0, v2 - v0)
+    normals /= np.linalg.norm(normals, axis=1, keepdims=True) + 1e-12
+
+    intensity = np.abs(normals @ r_light) / AVG_ILLUMINATION
+
+    # add some ambient so nothing is fully black
+    intensity += ambient / AVG_ILLUMINATION
+
+    # Convert desired colour to linear colour space, apply intensity factor, tone map to
+    # displayable range, then convert back to SRGB:
+    hdr_linear = intensity[:, np.newaxis] * _srgb_to_linear(color)
+    ldr_linear = _reinhard_luminance_tonemap(hdr_linear)
+    face_colors_srgb = _linear_to_srgb(ldr_linear)
+
+    face_colors = np.column_stack([face_colors_srgb, np.ones(len(faces))])
+    return face_colors
+
+
 class CurrentObject(object):
     def __init__(self, r0, zprime, xprime=None, n_turns=1, name=None):
         """A current-carrying object with a coordinate system centred at position r0 =
@@ -238,23 +289,136 @@ class CurrentObject(object):
     def local_lines(self):
         return []
 
-    def show(
-        self, surfaces=True, lines=False, color=torc.COPPER, tube_radius=1e-3, **kwargs
+    def show_mpl(
+        self, surfaces=True, lines=False, color=torc.COPPER, **kwargs
     ):
-        from mayavi.mlab import mesh, plot3d
+        from mpl_toolkits import mplot3d
+        import matplotlib.pyplot as plt
+
+        ax = plt.axes(projection='3d')
+
+        # Aspect ratio
+        asp_x, asp_y, asp_z = 0, 0, 0
+
         if surfaces:
             surfaces = self.surfaces()
             for x, y, z in surfaces:
-                surf = mesh(x, y, z, color=color, **kwargs)
-                surf.actor.property.specular = 1.0
-                surf.actor.property.specular_power = 128.0
+                ax.plot_surface(x, y, z, color=color, **kwargs)
+                asp_x = max(asp_x, np.ptp(x))
+                asp_y = max(asp_y, np.ptp(y))
+                asp_z = max(asp_z, np.ptp(z))
         if lines:
             lines = self.lines()
             for x, y, z in lines:
-                surf = plot3d(x, y, z, color=color, tube_radius=tube_radius, **kwargs)
-                surf.actor.property.specular = 0.0
-                surf.actor.property.specular_power = 10.0
+                ax.plot3D(x, y, z, color=color, **kwargs)
+                asp_x = max(asp_x, np.ptp(x))
+                asp_y = max(asp_y, np.ptp(y))
+                asp_z = max(asp_z, np.ptp(z))
+                
+        ax.set_box_aspect((asp_x, asp_y, asp_z))
+        plt.show()
 
+    def show(self, surfaces=True, lines=False, color=torc.COPPER):
+        import pyqtgraph as pg
+        import pyqtgraph.opengl as gl
+        from pyqtgraph.Qt import QtCore, QtGui
+        
+        VIEW_WIDTH = 800
+        VIEW_HEIGHT = 600
+        VIEW_FOV = 30
+
+        app = pg.mkQApp()
+
+        # antialiasing:
+        fmt = QtGui.QSurfaceFormat()
+        fmt.setSamples(16)
+        QtGui.QSurfaceFormat.setDefaultFormat(fmt)
+
+        view = gl.GLViewWidget()
+
+        # Variable to store vertices for debugging
+        all_verts = []
+        
+        if surfaces:
+            surfaces_data = self.surfaces()
+            for x, y, z in surfaces_data:
+                # Print surface info for debugging
+                # print(f"Surface shape: {x.shape}, Z range: {np.min(z)}-{np.max(z)}")
+                
+                # Convert meshgrid format to vertices and faces for GLMeshItem
+                verts = np.column_stack([x.ravel(), y.ravel(), z.ravel()])
+                all_verts.extend(verts)
+
+                nrows, ncols = x.shape
+                i, j = np.mgrid[: nrows - 1, : ncols - 1]
+                idx = (i * ncols + j).ravel()
+                faces = np.column_stack(
+                    [
+                        idx,
+                        idx + 1,
+                        idx + ncols,
+                        idx + ncols,
+                        idx + 1,
+                        idx + ncols + 1,
+                    ]
+                ).reshape(-1, 3)
+                
+                mesh = gl.GLMeshItem(
+                    vertexes=verts,
+                    faces=faces,
+                    faceColors=_do_shading(verts, faces, color),
+                    smooth=False,
+                    computeNormals=False,
+                )
+                view.addItem(mesh)
+        
+        if lines:
+            lines_data = self.lines()
+            for x, y, z in lines_data:
+                # Print line info for debugging
+                # print(f"Line shape: {x.shape}, Z range: {np.min(z)}-{np.max(z)}")
+                
+                # Create line path
+                pts = np.vstack([x, y, z]).T
+                all_verts.extend(pts)
+                
+                line = gl.GLLinePlotItem(
+                    pos=pts,
+                    color=(*color, 1.0),
+                    antialias=True,
+                )
+                view.addItem(line)
+        
+        # Midpoint and extent of data:
+        if all_verts:
+            r = np.array(all_verts)
+            r0 = (r.max(axis=0) + r.min(axis=0)) / 2
+            rmax = np.sqrt(((r - r0) ** 2).sum(axis=1)).max()
+        else:
+            r0 = 0
+            rmax = 1
+
+        # Camera and scene params:
+        view.resize(VIEW_WIDTH, VIEW_HEIGHT)
+        view.setBackgroundColor('lightgrey')
+
+        # axis guidelines
+        axis = gl.GLAxisItem()
+        axis.setSize(rmax / 2, rmax / 2, rmax / 2)
+        view.addItem(axis)
+
+        view.opts['fov'] = VIEW_FOV
+        view.setCameraParams(elevation=30, azimuth=-60)
+
+        view.opts['center'] = pg.Vector(*r0)
+        theta_fov = VIEW_FOV * pi / 180
+        view.opts['distance'] = (
+            max(VIEW_WIDTH / VIEW_HEIGHT, 1) * rmax / np.tan(theta_fov / 2)
+        )
+
+        view.show()
+        app.exec()
+    
     def __str__(self):
         return _formatobj(self, 'name')
 
@@ -423,7 +587,7 @@ class Arc(Container):
             self.add(Line(r0_seg, r1_seg, n_turns=n_turns))
 
     def local_lines(self):
-        n_theta = int((self.phi_1 - self.phi_0) / (pi / 36)) + 1  # ~every 5 degrees
+        n_theta = int(round((self.phi_1 - self.phi_0) * 180 / pi)) + 1  # every 1 degree
         theta = np.linspace(self.phi_0, self.phi_1, n_theta)
         xprime = self.R * np.cos(theta)
         yprime = self.R * np.sin(theta)
@@ -463,7 +627,7 @@ class RoundCoil(Container):
     def local_surfaces(self):
         # Create arrays (in local coordinates) describing surfaces of the coil for
         # plotting:
-        n_theta = 73  # 73 is every 5 degrees
+        n_theta = 361  # every 1 degree
         r, zprime, theta = _rectangular_tube(
             self.R_inner,
             self.R_outer,
@@ -568,7 +732,7 @@ class CurvedSegment(Container):
     def local_surfaces(self):
         # Create arrays (in local coordinates) describing surfaces of the segment for
         # plotting:
-        n_theta = int((self.phi_1 - self.phi_0) / (pi / 36)) + 1  # ~every 5 degrees
+        n_theta = int(round((self.phi_1 - self.phi_0) * 180 / pi)) + 1  # every 1 degree
         r, zprime, theta = _rectangular_tube(
             self.R_inner,
             self.R_outer,
@@ -703,11 +867,3 @@ class CoilPair(Container):
             r0_coil = r0 + displacement * unit_vec
             n_coil = self.zprime if parity == +1 else unit_vec
             self.add(coiltype(r0_coil, n_coil, *args, **kwargs))
-
-
-def show(*args, **kwargs):
-    """Wrapper around mayavi.mlab.show, passing all args and kwargs to it. Provided for
-    conveneience. This function imports mayavi only when called, so that mayavi is not
-    imported even if not being used"""
-    from mayavi.mlab import show
-    show(*args, **kwargs)

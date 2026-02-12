@@ -14,7 +14,6 @@ from torc import (
     X,
     Y,
     Z,
-    show,
     SILVER,
     COPPER,
 )
@@ -171,5 +170,4 @@ def make_coils(
 if __name__ == '__main__':
     # Show a 3D rendering of the coils
     coils = make_coils()
-    coils.show(lines=False, surfaces=True, color=COPPER)
-    show()
+    coils.show(surfaces=True, color=COPPER)

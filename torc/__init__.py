@@ -29,7 +29,6 @@ from .torc import (
     RoundCoil,
     RacetrackCoil,
     CoilPair,
-    show
 )
 
 __all__ = [
@@ -53,5 +52,4 @@ __all__ = [
     'RoundCoil',
     'RacetrackCoil',
     'CoilPair',
-    'show'
 ]
