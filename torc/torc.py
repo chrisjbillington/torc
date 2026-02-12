@@ -298,21 +298,28 @@ class CurrentObject(object):
                 calculations. Defaults to 1.
             name (str, optional): An identifying name, used for lookup in a
                 :class:`Container`."""
+        #: Centre position ``(x, y, z)`` in the lab frame (metres).
         self.r0 = np.array(r0)
+        #: Unit vector for the local z' axis in lab coordinates.
         self.zprime = _unit(zprime)
         if xprime is None:
             # A random vector that is orthogonal to zprime:
             xprime = _cross(np.random.randn(3), zprime)
+        #: Unit vector for the local x' axis in lab coordinates.
         self.xprime = _unit(xprime)
 
         if not abs(np.dot(self.xprime, self.zprime)) < 1e-10:
             raise ValueError("Primary and secondary axes of object not orthogonal")
 
+        #: Unit vector for the local y' axis in lab coordinates (computed as
+        #: z' x x').
         self.yprime = _cross(self.zprime, self.xprime)
 
         # Rotation matrix from local frame to lab frame:
-        self.Q_rot = np.stack([self.xprime, self.yprime, self.zprime], axis=1)
+        self._Q_rot = np.stack([self.xprime, self.yprime, self.zprime], axis=1)
+        #: Overall current multiplier used in field calculations.
         self.n_turns = n_turns
+        #: Identifying name for lookup in a :class:`Container`, or ``None``.
         self.name = name
 
     @property
@@ -330,7 +337,7 @@ class CurrentObject(object):
         """The z coordinate of the object's centre position in the lab frame."""
         return self.r0[2]
 
-    def pos_to_local(self, r):
+    def _pos_to_local(self, r):
         """Transform a position from lab coordinates to the object's local frame.
 
         Args:
@@ -341,9 +348,9 @@ class CurrentObject(object):
             numpy.ndarray: Position ``(xprime, yprime, zprime)`` in the local
             frame."""
         r = _broadcast(r)
-        return np.einsum('ij,j...->i...', self.Q_rot.T, (r.T - self.r0).T)
+        return np.einsum('ij,j...->i...', self._Q_rot.T, (r.T - self.r0).T)
 
-    def pos_to_lab(self, rprime):
+    def _pos_to_lab(self, rprime):
         """Transform a position from the object's local frame to lab coordinates.
 
         Args:
@@ -354,12 +361,12 @@ class CurrentObject(object):
         Returns:
             numpy.ndarray: Position ``(x, y, z)`` in the lab frame."""
         rprime = _broadcast(rprime)
-        return (np.einsum('ij,j...->i...', self.Q_rot, rprime).T + self.r0).T
+        return (np.einsum('ij,j...->i...', self._Q_rot, rprime).T + self.r0).T
 
-    def vector_to_local(self, v):
+    def _vector_to_local(self, v):
         """Rotate a vector from lab coordinates to the object's local frame.
 
-        Unlike :meth:`pos_to_local`, this applies only the rotation and not the
+        Unlike :meth:`_pos_to_local`, this applies only the rotation and not the
         translation — appropriate for directions, field vectors, etc.
 
         Args:
@@ -370,12 +377,12 @@ class CurrentObject(object):
             numpy.ndarray: Vector ``(v_xprime, v_yprime, v_zprime)`` in the local
             frame."""
         v = _broadcast(v)
-        return np.einsum('ij,j...->i...', self.Q_rot.T, v)
+        return np.einsum('ij,j...->i...', self._Q_rot.T, v)
 
-    def vector_to_lab(self, vprime):
+    def _vector_to_lab(self, vprime):
         """Rotate a vector from the object's local frame to lab coordinates.
 
-        Unlike :meth:`pos_to_lab`, this applies only the rotation and not the
+        Unlike :meth:`_pos_to_lab`, this applies only the rotation and not the
         translation — appropriate for directions, field vectors, etc.
 
         Args:
@@ -386,7 +393,7 @@ class CurrentObject(object):
         Returns:
             numpy.ndarray: Vector ``(v_x, v_y, v_z)`` in the lab frame."""
         vprime = _broadcast(vprime)
-        return np.einsum('ij,j...->i...', self.Q_rot, vprime)
+        return np.einsum('ij,j...->i...', self._Q_rot, vprime)
 
     def B(self, r, I):
         """Compute the magnetic field at a position in lab coordinates.
@@ -403,10 +410,10 @@ class CurrentObject(object):
             numpy.ndarray: Magnetic field ``(Bx, By, Bz)`` in the lab frame
             (tesla)."""
         # r = _broadcast(r)
-        rprime = self.pos_to_local(r)
-        return self.vector_to_lab(self.B_local(rprime, I * self.n_turns))
+        rprime = self._pos_to_local(r)
+        return self._vector_to_lab(self._B_local(rprime, I * self.n_turns))
 
-    def B_local(self, rprime, I):
+    def _B_local(self, rprime, I):
         """Compute the magnetic field in the local coordinate frame.
 
         Subclasses override this to provide the actual field calculation. The base
@@ -456,20 +463,20 @@ class CurrentObject(object):
         """Return a list of 3D surface meshes in lab coordinates for visualisation.
         Each element is a tuple ``(x, y, z)`` of 2D arrays suitable for mesh
         rendering."""
-        return [self.pos_to_lab(pts) for pts in self.local_surfaces()]
+        return [self._pos_to_lab(pts) for pts in self._local_surfaces()]
 
     def lines(self):
         """Return a list of 3D line paths in lab coordinates for visualisation.
         Each element is a tuple ``(x, y, z)`` of 1D arrays tracing the path."""
-        return [self.pos_to_lab(pts) for pts in self.local_lines()]
+        return [self._pos_to_lab(pts) for pts in self._local_lines()]
 
-    def local_surfaces(self):
+    def _local_surfaces(self):
         """Return surface meshes in local coordinates. Subclasses override this to
         describe their geometry for visualisation. The base class returns an empty
         list."""
         return []
 
-    def local_lines(self):
+    def _local_lines(self):
         """Return line paths in local coordinates. Subclasses override this to
         describe their geometry for visualisation. The base class returns an empty
         list."""
@@ -727,7 +734,7 @@ class Loop(CurrentObject):
         super().__init__(r0=r0, zprime=n, n_turns=n_turns, name=name)
         self.R = R
 
-    def B_local(self, rprime, I):
+    def _B_local(self, rprime, I):
         """Compute the magnetic field of this loop in local coordinates.
 
         Args:
@@ -746,7 +753,7 @@ class Loop(CurrentObject):
         B_yprime = B_rho * np.sin(phi)
         return np.array([B_xprime, B_yprime, B_zprime])
 
-    def local_lines(self):
+    def _local_lines(self):
         theta = np.linspace(-np.pi, np.pi, 361)
         xprime = self.R * np.cos(theta)
         yprime = self.R * np.sin(theta)
@@ -773,7 +780,7 @@ class Line(CurrentObject):
         super().__init__(r0=midpoint, zprime=zprime, n_turns=n_turns, name=name)
         self.L = np.linalg.norm(zprime)
 
-    def B_local(self, rprime, I):
+    def _B_local(self, rprime, I):
         """Compute the magnetic field of this wire in local coordinates.
 
         Args:
@@ -794,7 +801,7 @@ class Line(CurrentObject):
         B_yprime = B_phi * np.cos(phi)
         return np.array([B_xprime, B_yprime, np.zeros_like(B_xprime)])
 
-    def local_lines(self):
+    def _local_lines(self):
         zprime = np.array([-self.L / 2, self.L / 2], dtype=float)
         xprime = yprime = 0
         return [(xprime, yprime, zprime)]
@@ -848,11 +855,11 @@ class Arc(Container):
             xprime1 = R * np.cos(phi_seg_stop)
             yprime1 = R * np.sin(phi_seg_stop)
 
-            r_start_seg = self.pos_to_lab((xprime0, yprime0, 0))
-            r_end_seg = self.pos_to_lab((xprime1, yprime1, 0))
+            r_start_seg = self._pos_to_lab((xprime0, yprime0, 0))
+            r_end_seg = self._pos_to_lab((xprime1, yprime1, 0))
             self.add(Line(r_start_seg, r_end_seg, n_turns=n_turns))
 
-    def local_lines(self):
+    def _local_lines(self):
         n_theta = int(round((self.phi_1 - self.phi_0) * 180 / np.pi)) + 1  # every 1 degree
         theta = np.linspace(self.phi_0, self.phi_1, n_theta)
         xprime = self.R * np.cos(theta)
@@ -899,10 +906,10 @@ class RoundCoil(Container):
         n_turns_per_seg = self.n_turns / cross_sec_segs
         segs = _segments(R_inner, R_outer, -height / 2, height / 2, cross_sec_segs)
         for R, zprime in segs:
-            r0_loop = self.pos_to_lab((0, 0, zprime))
+            r0_loop = self._pos_to_lab((0, 0, zprime))
             self.add(Loop(r0_loop, n, R, n_turns=n_turns_per_seg))
 
-    def local_surfaces(self):
+    def _local_surfaces(self):
         # Create arrays (in local coordinates) describing surfaces of the coil for
         # plotting:
         n_theta = 361  # every 1 degree
@@ -970,11 +977,11 @@ class StraightSegment(Container):
         n_turns_per_seg = self.n_turns / cross_sec_segs
         segs = _segments(-width / 2, width / 2, -height / 2, height / 2, cross_sec_segs)
         for xprime, yprime in segs:
-            r_start_line = self.pos_to_lab((xprime, yprime, -self.L / 2))
-            r_end_line = self.pos_to_lab((xprime, yprime, self.L / 2))
+            r_start_line = self._pos_to_lab((xprime, yprime, -self.L / 2))
+            r_end_line = self._pos_to_lab((xprime, yprime, self.L / 2))
             self.add(Line(r_start_line, r_end_line, n_turns=n_turns_per_seg))
 
-    def local_surfaces(self):
+    def _local_surfaces(self):
         # Create arrays (in local coordinates) describing surfaces of the segment for
         # plotting:
         xprime, yprime, zprime = _rectangular_tube(
@@ -1044,10 +1051,10 @@ class CurvedSegment(Container):
         n_turns_per_seg = self.n_turns / cross_sec_segs
         segs = _segments(R_inner, R_outer, -height / 2, height / 2, cross_sec_segs)
         for R, zprime in segs:
-            r0_arc = self.pos_to_lab((0, 0, zprime))
+            r0_arc = self._pos_to_lab((0, 0, zprime))
             self.add(Arc(r0_arc, n, n_perp, R, phi_0, phi_1, n_turns_per_seg, arc_segs))
 
-    def local_surfaces(self):
+    def _local_surfaces(self):
         # Create arrays (in local coordinates) describing surfaces of the segment for
         # plotting:
         n_theta = int(round((self.phi_1 - self.phi_0) * 180 / np.pi)) + 1  # every 1 degree
@@ -1127,7 +1134,7 @@ class RacetrackCoil(Container):
         ]:
             self.add(
                 CurvedSegment(
-                    self.pos_to_lab((xprime, yprime, 0)),
+                    self._pos_to_lab((xprime, yprime, 0)),
                     n,
                     n_perp,
                     R_inner,
@@ -1151,9 +1158,9 @@ class RacetrackCoil(Container):
                 yprime = sign * absyprime
                 self.add(
                     StraightSegment(
-                        self.pos_to_lab((xprime0, yprime, 0)),
-                        self.pos_to_lab((xprime1, yprime, 0)),
-                        self.vector_to_lab(Z),
+                        self._pos_to_lab((xprime0, yprime, 0)),
+                        self._pos_to_lab((xprime1, yprime, 0)),
+                        self._vector_to_lab(Z),
                         self.R_outer - self.R_inner,
                         self.height,
                         n_turns=n_turns,
@@ -1171,9 +1178,9 @@ class RacetrackCoil(Container):
                 xprime = sign * absxprime
                 self.add(
                     StraightSegment(
-                        self.pos_to_lab((xprime, yprime0, 0)),
-                        self.pos_to_lab((xprime, yprime1, 0)),
-                        self.vector_to_lab(Z),
+                        self._pos_to_lab((xprime, yprime0, 0)),
+                        self._pos_to_lab((xprime, yprime1, 0)),
+                        self._vector_to_lab(Z),
                         self.R_outer - self.R_inner,
                         self.height,
                         n_turns=n_turns,

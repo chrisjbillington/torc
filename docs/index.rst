@@ -111,16 +111,14 @@ Module reference
 ----------------
 
 .. autoclass:: torc.torc.CurrentObject
-    :members: x, y, z, pos_to_local, pos_to_lab, vector_to_local, vector_to_lab, B, B_local, dB, surfaces, lines, local_surfaces, local_lines, show
+    :members: r0, xprime, yprime, zprime, n_turns, name, x, y, z, B, dB, surfaces, lines, show
 
 .. autoclass:: torc.torc.Container
     :members: add, index, B, surfaces, lines
 
 .. autoclass:: torc.torc.Loop
-    :members: B_local
 
 .. autoclass:: torc.torc.Line
-    :members: B_local
 
 .. autoclass:: torc.torc.Arc
 
