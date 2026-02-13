@@ -11,6 +11,7 @@ from torc.torc import (
     X,
     Y,
     Z,
+    ORIGIN,
     CurrentObject,
     Container,
     Line,

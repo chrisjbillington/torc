@@ -97,14 +97,14 @@ RGB colour tuples for use with :meth:`~torc.torc.CurrentObject.show`.
 .. autodata:: torc.torc.SILVER
 
 
-------------
-Unit vectors
-------------
+----------------------------
+Unit vectors and coordinates
+----------------------------
 
 .. autodata:: torc.torc.X
 .. autodata:: torc.torc.Y
 .. autodata:: torc.torc.Z
-
+.. autodata:: torc.torc.ORIGIN
 
 ----------------
 Module reference

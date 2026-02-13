@@ -43,11 +43,13 @@ COPPER = (0.722, 0.451, 0.200)
 SILVER = (0.75, 0.75, 0.75)
 
 #: Unit vector in the x direction.
-X = (1, 0, 0)
+X = np.array([1.0, 0.0, 0.0])
 #: Unit vector in the y direction.
-Y = (0, 1, 0)
+Y = np.array([0.0, 1.0, 0.0])
 #: Unit vector in the z direction.
-Z = (0, 0, 1)
+Z = np.array([0.0, 0.0, 1.0])
+#: Coordinate vector of the origin
+ORIGIN = np.array([0.0, 0.0, 0.0])
 
 
 # Default discretisation parameters:
@@ -523,7 +525,7 @@ class CurrentObject(object):
                 Defaults to :data:`COPPER`."""
         VIEW_WIDTH = 800
         VIEW_HEIGHT = 600
-        VIEW_FOV = 30
+        VIEW_FOV = 5
 
         app = pg.mkQApp()
 
@@ -567,6 +569,7 @@ class CurrentObject(object):
                     faceColors=_do_shading_triangles(verts, faces, color),
                     smooth=False,
                     computeNormals=False,
+                    glOptions='translucent',
                 )
                 view.addItem(mesh)
         
@@ -583,6 +586,8 @@ class CurrentObject(object):
                 line = gl.GLLinePlotItem(
                     pos=pts,
                     color=(*color, 1.0),
+                    width=2,
+                    mode='lines',
                     antialias=True,
                 )
                 view.addItem(line)
@@ -600,13 +605,8 @@ class CurrentObject(object):
         view.resize(VIEW_WIDTH, VIEW_HEIGHT)
         view.setBackgroundColor('lightgrey')
 
-        # axis guidelines
-        axis = gl.GLAxisItem()
-        axis.setSize(rmax / 2, rmax / 2, rmax / 2)
-        view.addItem(axis)
-
         view.opts['fov'] = VIEW_FOV
-        view.setCameraParams(elevation=30, azimuth=-60)
+        view.setCameraParams(elevation=35.264, azimuth=-135)
 
         view.opts['center'] = pg.Vector(*r0)
         theta_fov = VIEW_FOV * np.pi / 180
@@ -616,6 +616,7 @@ class CurrentObject(object):
 
         view.show()
         app.exec()
+        # return app, view
     
     def __str__(self):
         return _formatobj(self, 'name')
