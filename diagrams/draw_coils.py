@@ -9,6 +9,9 @@ import pyqtgraph.opengl as gl
 import pyqtgraph as pg
 
 from torc import (
+    Line,
+    Arc,
+    Loop,
     StraightSegment,
     CurvedSegment,
     RoundCoil,
@@ -267,7 +270,7 @@ def draw_length_indicator(
     )
 
 
-def draw_straightsegment():
+def draw_StraightSegment():
     LENGTH = 7
     WIDTH = 2.5
     HEIGHT = 1.5
@@ -335,7 +338,7 @@ def draw_straightsegment():
     img.save('StraightSegment.png')
 
 
-def draw_curvedsegment():
+def draw_CurvedSegment():
     HEIGHT = 2
     R_INNER = 3
     R_OUTER = 4.5
@@ -423,7 +426,7 @@ def draw_curvedsegment():
     img.save('CurvedSegment.png')
 
 
-def draw_racetrackcoil():
+def draw_RacetrackCoil():
     LENGTH = 6
     WIDTH = 4
     HEIGHT = 1
@@ -534,7 +537,7 @@ def draw_racetrackcoil():
     img.save('RacetrackCoil.png')
 
 
-def draw_roundcoil():
+def draw_RoundCoil():
     HEIGHT = 1.75
     R_INNER = 3
     R_OUTER = 4.5
@@ -608,9 +611,131 @@ def draw_roundcoil():
     img.save('RoundCoil.png')
 
 
-# draw_straightsegment()
-draw_racetrackcoil()
-# draw_roundcoil()
-# draw_curvedsegment()
+def draw_Line():
+    LENGTH = 7
+
+    obj = Line(r_start=-LENGTH / 2 * Z, r_end=LENGTH / 2 * Z)
+
+    app, view = obj.show(surfaces=False, lines=True)
+
+    setup_scene(view)
+    draw_coord_axes(view)
+
+    # length
+    LENGTH_GUIDELINE_START = -LENGTH / 2 * Z
+    LENGTH_GUIDELINE_END = LENGTH / 2 * Z
+    draw_length_indicator(
+        view,
+        LENGTH_GUIDELINE_START,
+        LENGTH_GUIDELINE_END,
+        n_tick=(X - Y) / np.sqrt(2),
+        tick_length=1 + TICK_LENGTH,
+        text='length',
+        color=BLUE,
+    )
+
+    draw_point(view, -LENGTH / 2 * Z, "r_start")
+    draw_point(view, LENGTH / 2 * Z, "r_end", label_pos='above')
+
+    view.show()
+    app.processEvents()
+    img = view.grabFramebuffer()
+    img.save('Line.png')
 
 
+def draw_Arc():
+    R = 4
+    SWEPT_ANGLE = np.pi / 2
+
+
+    obj = Arc(
+        r0=ORIGIN,
+        n=Z,
+        u=X,
+        radius=R,
+        swept_angle=SWEPT_ANGLE,
+    )
+
+    app, view = obj.show(surfaces=False, lines=True)
+
+    setup_scene(view)
+    draw_coord_axes(view)
+
+    # Radius
+    draw_sector(view, ORIGIN, R * X, Z, SWEPT_ANGLE, color=TICK_COLOR)
+
+    R_END = R * X
+
+    draw_length_indicator(
+        view,
+        ORIGIN,
+        R_END,
+        n_tick=-Y,
+        tick_length=TICK_LENGTH,
+        # n_tick=Y,
+        # tick_length=R_OUTER + TICK_LENGTH,
+        text='radius',
+        color=PURPLE,
+        # label_alignment='right'
+    )
+
+    # swept angle
+    draw_arc_arrow(view, ORIGIN, X, Z, SWEPT_ANGLE, color=BLACK)
+    draw_label(
+        view,
+        (1 + DISTANCE_LABEL_OFFSET) * (X + Y) / np.sqrt(2),
+        "swept_angle",
+        alignment='bottom',
+    )
+
+    view.show()
+    app.processEvents()
+    img = view.grabFramebuffer()
+    img.save('Arc.png')
+
+
+def draw_Loop():
+    R = 4
+
+    obj = Loop(
+        r0=ORIGIN,
+        n=Z,
+        radius=R,
+    )
+
+    app, view = obj.show(surfaces=False, lines=True)
+
+    setup_scene(view)
+    draw_coord_axes(view)
+
+    # Radius
+    # draw_sector(view, ORIGIN, R * X, Z, SWEPT_ANGLE, color=TICK_COLOR)
+
+    R_END = R * X
+
+    draw_length_indicator(
+        view,
+        ORIGIN,
+        R_END,
+        n_tick=-Y,
+        tick_length=TICK_LENGTH,
+        # n_tick=Y,
+        # tick_length=R_OUTER + TICK_LENGTH,
+        text='radius',
+        color=PURPLE,
+        # label_alignment='right'
+    )
+
+    view.show()
+    app.processEvents()
+    img = view.grabFramebuffer()
+    img.save('Loop.png')
+
+
+# draw_StraightSegment()
+# draw_RacetrackCoil()
+# draw_RoundCoil()
+# draw_CurvedSegment()
+# draw_Line()
+# draw_Arc()
+# draw_Loop()

@@ -510,7 +510,7 @@ class CurrentObject(object):
     #     ax.set_box_aspect((asp_x, asp_y, asp_z))
     #     plt.show()
 
-    def show(self, surfaces=True, lines=False, color=COPPER):
+    def show(self, surfaces=True, lines=False, line_width=5, color=COPPER):
         """Open an interactive 3D pyqtgraph/OpenGL window displaying this object's
         geometry. The window blocks until closed.
 
@@ -580,12 +580,12 @@ class CurrentObject(object):
                 # Create line path
                 pts = np.vstack([x, y, z]).T
                 all_verts.extend(pts)
-                
+
                 line = gl.GLLinePlotItem(
                     pos=pts,
                     color=(*color, 1.0),
-                    width=2,
-                    mode='lines',
+                    width=line_width,
+                    # mode='lines',
                     antialias=True,
                 )
                 view.addItem(line)
@@ -596,7 +596,7 @@ class CurrentObject(object):
             r0 = (r.max(axis=0) + r.min(axis=0)) / 2
             rmax = np.sqrt(((r - r0) ** 2).sum(axis=1)).max()
         else:
-            r0 = 0
+            r0 = ORIGIN
             rmax = 1
 
         # Camera and scene params:
