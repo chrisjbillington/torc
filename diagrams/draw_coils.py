@@ -246,9 +246,10 @@ def draw_straightsegment():
     R_END = LENGTH / 2 * X
 
     obj = StraightSegment(
+        r0=ORIGIN,
         n=Z,
-        r_start=R_START,
-        r_end=R_END,
+        u=X,
+        length=LENGTH,
         width=WIDTH,
         height=HEIGHT,
     )
@@ -317,12 +318,11 @@ def draw_curvedsegment():
     obj = CurvedSegment(
         r0=ORIGIN,
         n=Z,
-        n_perp=X,
-        R_inner=R_INNER,
-        R_outer=R_OUTER,
+        u=np.cos(PHI0) * X + np.sin(PHI0) * Y,
         height=HEIGHT,
-        phi_0=PHI0,
-        phi_1=PHI1,
+        inner_radius=R_INNER,
+        outer_radius=R_OUTER,
+        swept_angle=PHI1 - PHI0,
     )
 
     app, view = obj.show()
@@ -398,12 +398,12 @@ def draw_racetrackcoil():
     obj = RacetrackCoil(
         r0=ORIGIN,
         n=Z,
-        n_perp=X,
-        width=WIDTH,
-        length=LENGTH,
+        u=X,
+        inner_length=WIDTH,
+        inner_width=LENGTH,
         height=HEIGHT,
-        R_inner=R_INNER,
-        R_outer=R_OUTER,
+        inner_radius=R_INNER,
+        outer_radius=R_OUTER,
     )
 
     app, view = obj.show()
@@ -507,8 +507,8 @@ def draw_roundcoil():
         r0=ORIGIN,
         n=Z,
         height=HEIGHT,
-        R_inner=R_INNER,
-        R_outer=R_OUTER,
+        inner_radius=R_INNER,
+        outer_radius=R_OUTER,
     )
 
     app, view = obj.show()

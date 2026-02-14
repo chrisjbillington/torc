@@ -58,11 +58,11 @@ Example usage
         coiltype=RoundCoil,
         r0=(0, 0, 0),
         n=Z,
-        displacement=0.05,
-        R_inner=0.04,
-        R_outer=0.06,
+        separation=0.10,
         height=0.01,
-        n_turns=100,
+        inner_radius=0.04,
+        outer_radius=0.06,
+        num_turns=100,
         parity='anti-helmholtz',
     )
 
@@ -111,7 +111,7 @@ Module reference
 ----------------
 
 .. autoclass:: torc.torc.CurrentObject
-    :members: r0, xprime, yprime, zprime, n_turns, name, x, y, z, B, dB, surfaces, lines, show
+    :members: r0, u, v, n, num_turns, name, x, y, z, B, dB, surfaces, lines, show
 
 .. autoclass:: torc.torc.Container
     :members: add, index, B, surfaces, lines

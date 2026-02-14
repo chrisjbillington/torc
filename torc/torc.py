@@ -279,48 +279,49 @@ def _do_shading_triangles(verts, faces, color, r_light=(1, 2, 3), ambient=0.1):
 
 
 class CurrentObject(object):
-    def __init__(self, r0, zprime, xprime=None, n_turns=1, name=None):
+    def __init__(self, r0, n, u=None, num_turns=1, name=None):
         """Base class for a current-carrying object with its own local coordinate frame.
 
         The object is centred at position r0 with a right-handed local coordinate
-        system (xprime, yprime, zprime) defined by the primary axis zprime and
-        secondary axis xprime. The two axes do not need to be normalised (they will
-        be normalised automatically), but must be orthogonal.
+        system (u, v, n) defined by the primary axis n and secondary axis u.
+        The third axis v is computed as n x u. The two provided axes do not need to
+        be normalised (they will be normalised automatically), but must be orthogonal.
 
         Args:
             r0 (tuple or array-like): Position ``(x, y, z)`` of the object's centre
                 (metres).
-            zprime (tuple or array-like): Primary axis direction ``(zp_x, zp_y, zp_z)``
-                in lab coordinates. Need not be normalised.
-            xprime (tuple or array-like, optional): Secondary axis direction
-                ``(xp_x, xp_y, xp_z)`` in lab coordinates, must be orthogonal to
-                zprime. If ``None`` (the default), a random orthogonal direction is
-                chosen — suitable for objects with rotational symmetry.
-            n_turns (float): Overall multiplier for the current used in field
+            n (tuple or array-like): Primary axis direction in lab coordinates. For
+                planar objects (coils, arcs), this is the normal to the plane. Need
+                not be normalised.
+            u (tuple or array-like, optional): Secondary axis direction in lab
+                coordinates, must be orthogonal to n. If ``None`` (the default), a
+                random orthogonal direction is chosen — suitable for objects with
+                rotational symmetry.
+            num_turns (float): Overall multiplier for the current used in field
                 calculations. Defaults to 1.
             name (str, optional): An identifying name, used for lookup in a
                 :class:`Container`."""
         #: Centre position ``(x, y, z)`` in the lab frame (metres).
         self.r0 = np.array(r0)
-        #: Unit vector for the local z' axis in lab coordinates.
-        self.zprime = _unit(zprime)
-        if xprime is None:
-            # A random vector that is orthogonal to zprime:
-            xprime = _cross(np.random.randn(3), zprime)
-        #: Unit vector for the local x' axis in lab coordinates.
-        self.xprime = _unit(xprime)
+        #: Unit vector for the local n axis in lab coordinates.
+        self.n = _unit(n)
+        if u is None:
+            # A random vector that is orthogonal to n:
+            u = _cross(np.random.randn(3), n)
+        #: Unit vector for the local u axis in lab coordinates.
+        self.u = _unit(u)
 
-        if not abs(np.dot(self.xprime, self.zprime)) < 1e-10:
+        if not abs(np.dot(self.u, self.n)) < 1e-10:
             raise ValueError("Primary and secondary axes of object not orthogonal")
 
-        #: Unit vector for the local y' axis in lab coordinates (computed as
-        #: z' x x').
-        self.yprime = _cross(self.zprime, self.xprime)
+        #: Unit vector for the local v axis in lab coordinates (computed as
+        #: n x u).
+        self.v = _cross(self.n, self.u)
 
         # Rotation matrix from local frame to lab frame:
-        self._Q_rot = np.stack([self.xprime, self.yprime, self.zprime], axis=1)
+        self._Q_rot = np.stack([self.u, self.v, self.n], axis=1)
         #: Overall current multiplier used in field calculations.
-        self.n_turns = n_turns
+        self.num_turns = num_turns
         #: Identifying name for lookup in a :class:`Container`, or ``None``.
         self.name = name
 
@@ -347,60 +348,56 @@ class CurrentObject(object):
                 (metres). Components may be arrays for vectorised evaluation.
 
         Returns:
-            numpy.ndarray: Position ``(xprime, yprime, zprime)`` in the local
-            frame."""
+            numpy.ndarray: Position ``(u, v, n)`` in the local frame."""
         r = _broadcast(r)
         return np.einsum('ij,j...->i...', self._Q_rot.T, (r.T - self.r0).T)
 
-    def _pos_to_lab(self, rprime):
+    def _pos_to_lab(self, r_local):
         """Transform a position from the object's local frame to lab coordinates.
 
         Args:
-            rprime (tuple or numpy.ndarray): Position ``(xprime, yprime, zprime)``
-                in the local frame (metres). Components may be arrays for vectorised
-                evaluation.
+            r_local (tuple or numpy.ndarray): Position ``(u, v, n)`` in the local
+                frame (metres). Components may be arrays for vectorised evaluation.
 
         Returns:
             numpy.ndarray: Position ``(x, y, z)`` in the lab frame."""
-        rprime = _broadcast(rprime)
-        return (np.einsum('ij,j...->i...', self._Q_rot, rprime).T + self.r0).T
+        r_local = _broadcast(r_local)
+        return (np.einsum('ij,j...->i...', self._Q_rot, r_local).T + self.r0).T
 
-    def _vector_to_local(self, v):
+    def _vector_to_local(self, vec):
         """Rotate a vector from lab coordinates to the object's local frame.
 
         Unlike :meth:`_pos_to_local`, this applies only the rotation and not the
         translation — appropriate for directions, field vectors, etc.
 
         Args:
-            v (tuple or numpy.ndarray): Vector ``(v_x, v_y, v_z)`` in the lab
+            vec (tuple or numpy.ndarray): Vector ``(v_x, v_y, v_z)`` in the lab
                 frame. Components may be arrays for vectorised evaluation.
 
         Returns:
-            numpy.ndarray: Vector ``(v_xprime, v_yprime, v_zprime)`` in the local
-            frame."""
-        v = _broadcast(v)
-        return np.einsum('ij,j...->i...', self._Q_rot.T, v)
+            numpy.ndarray: Vector ``(v_u, v_v, v_n)`` in the local frame."""
+        vec = _broadcast(vec)
+        return np.einsum('ij,j...->i...', self._Q_rot.T, vec)
 
-    def _vector_to_lab(self, vprime):
+    def _vector_to_lab(self, v_local):
         """Rotate a vector from the object's local frame to lab coordinates.
 
         Unlike :meth:`_pos_to_lab`, this applies only the rotation and not the
         translation — appropriate for directions, field vectors, etc.
 
         Args:
-            vprime (tuple or numpy.ndarray): Vector ``(v_xprime, v_yprime,
-                v_zprime)`` in the local frame. Components may be arrays for
-                vectorised evaluation.
+            v_local (tuple or numpy.ndarray): Vector ``(v_u, v_v, v_n)`` in the
+                local frame. Components may be arrays for vectorised evaluation.
 
         Returns:
             numpy.ndarray: Vector ``(v_x, v_y, v_z)`` in the lab frame."""
-        vprime = _broadcast(vprime)
-        return np.einsum('ij,j...->i...', self._Q_rot, vprime)
+        v_local = _broadcast(v_local)
+        return np.einsum('ij,j...->i...', self._Q_rot, v_local)
 
     def B(self, r, I):
         """Compute the magnetic field at a position in lab coordinates.
 
-        The current is multiplied by :attr:`n_turns` before being passed to the
+        The current is multiplied by :attr:`num_turns` before being passed to the
         underlying field calculation.
 
         Args:
@@ -411,24 +408,24 @@ class CurrentObject(object):
         Returns:
             numpy.ndarray: Magnetic field ``(Bx, By, Bz)`` in the lab frame
             (tesla)."""
-        rprime = self._pos_to_local(r)
-        return self._vector_to_lab(self._B_local(rprime, I * self.n_turns))
+        r_local = self._pos_to_local(r)
+        return self._vector_to_lab(self._B_local(r_local, I * self.num_turns))
 
-    def _B_local(self, rprime, I):
+    def _B_local(self, r_local, I):
         """Compute the magnetic field in the local coordinate frame.
 
         Subclasses override this to provide the actual field calculation. The base
         class implementation returns zero.
 
         Args:
-            rprime (numpy.ndarray): Position ``(xprime, yprime, zprime)`` in the
-                local frame (metres).
-            I (float): Current (amps), already multiplied by :attr:`n_turns`.
+            r_local (numpy.ndarray): Position ``(u, v, n)`` in the local frame
+                (metres).
+            I (float): Current (amps), already multiplied by :attr:`num_turns`.
 
         Returns:
-            numpy.ndarray: Magnetic field ``(Bxprime, Byprime, Bzprime)`` in the
-            local frame (tesla)."""
-        return np.zeros_like(rprime)
+            numpy.ndarray: Magnetic field ``(B_u, B_v, B_n)`` in the local frame
+            (tesla)."""
+        return np.zeros_like(r_local)
 
     def dB(self, r, I, s, ds=10e-6):
         """Compute a directional derivative of the magnetic field.
@@ -463,12 +460,13 @@ class CurrentObject(object):
     def surfaces(self):
         """Return a list of 3D surface meshes in lab coordinates for visualisation.
         Each element is an array of shape ``(3, m, n)`` suitable for mesh
-        rendering."""
+        rendering. Local-frame arrays have components ``(u, v, n)``."""
         return [self._pos_to_lab(pts) for pts in self._local_surfaces()]
 
     def lines(self):
         """Return a list of 3D line paths in lab coordinates for visualisation.
-        Each element is an array of shape ``(3, n)``."""
+        Each element is an array of shape ``(3, n)``. Local-frame arrays have
+        components ``(u, v, n)``."""
         return [self._pos_to_lab(pts) for pts in self._local_lines()]
 
     def _local_surfaces(self):
@@ -636,13 +634,13 @@ class Container(CurrentObject):
         self,
         *children,
         r0=(0, 0, 0),
-        zprime=Z,
-        xprime=None,
-        n_turns=1,
+        n=Z,
+        u=None,
+        num_turns=1,
         name=None,
     ):
         super().__init__(
-            r0=r0, zprime=zprime, xprime=xprime, n_turns=n_turns, name=name
+            r0=r0, n=n, u=u, num_turns=num_turns, name=name
         )
         self.children = list(children)
 
@@ -718,93 +716,93 @@ class Container(CurrentObject):
 
 
 class Loop(CurrentObject):
-    def __init__(self, r0, n, R, n_turns=1, name=None):
+    def __init__(self, r0, n, radius, num_turns=1, name=None):
         """A circular current loop.
 
         Current flows counterclockwise when viewed from the direction the normal
-        vector points.
+        vector n points.
 
         Args:
             r0 (tuple or array-like): Centre position ``(x, y, z)`` (metres).
             n (tuple or array-like): Normal vector direction. Need not be
                 normalised.
-            R (float): Radius of the loop (metres).
-            n_turns (float): Overall current multiplier. Defaults to 1.
+            radius (float): Radius of the loop (metres).
+            num_turns (float): Overall current multiplier. Defaults to 1.
             name (str, optional): Identifying name for :class:`Container` lookup."""
-        super().__init__(r0=r0, zprime=n, n_turns=n_turns, name=name)
-        self.R = R
+        super().__init__(r0=r0, n=n, num_turns=num_turns, name=name)
+        self.radius = radius
 
-    def _B_local(self, rprime, I):
+    def _B_local(self, r_local, I):
         """Compute the magnetic field of this loop in local coordinates.
 
         Args:
-            rprime (numpy.ndarray): Position ``(xprime, yprime, zprime)`` in the
-                local frame (metres).
+            r_local (numpy.ndarray): Position ``(u, v, n)`` in the local frame
+                (metres).
             I (float): Current (amps).
 
         Returns:
-            numpy.ndarray: Field ``(Bxprime, Byprime, Bzprime)`` (tesla)."""
-        xprime, yprime, zprime = rprime
+            numpy.ndarray: Field ``(B_u, B_v, B_n)`` (tesla)."""
+        u_comp, v_comp, n_comp = r_local
         # Expression we need to call is in cylindrical coordinates:
-        rho = np.sqrt(xprime ** 2 + yprime ** 2)
-        B_rho, B_zprime = field_of_current_loop(rho, zprime, self.R, I)
-        phi = np.arctan2(yprime, xprime)
-        B_xprime = B_rho * np.cos(phi)
-        B_yprime = B_rho * np.sin(phi)
-        return np.array([B_xprime, B_yprime, B_zprime])
+        rho = np.sqrt(u_comp ** 2 + v_comp ** 2)
+        B_rho, B_n = field_of_current_loop(rho, n_comp, self.radius, I)
+        phi = np.arctan2(v_comp, u_comp)
+        B_u = B_rho * np.cos(phi)
+        B_v = B_rho * np.sin(phi)
+        return np.array([B_u, B_v, B_n])
 
     def _local_lines(self):
         theta = np.linspace(-np.pi, np.pi, 361)
-        xprime = self.R * np.cos(theta)
-        yprime = self.R * np.sin(theta)
-        zprime = np.zeros_like(theta)
-        return [np.array([xprime, yprime, zprime])]
+        u_pts = self.radius * np.cos(theta)
+        v_pts = self.radius * np.sin(theta)
+        n_pts = np.zeros_like(theta)
+        return [np.array([u_pts, v_pts, n_pts])]
 
 
 class Line(CurrentObject):
-    def __init__(self, r_start, r_end, n_turns=1, name=None):
+    def __init__(self, r_start, r_end, num_turns=1, name=None):
         """A straight current-carrying wire segment.
 
         Current flows from r_start to r_end. The object's centre (:attr:`r0`) is
-        the midpoint of the wire.
+        the midpoint of the wire. The local n axis points along the wire direction.
 
         Args:
             r_start (tuple or array-like): Start position ``(x, y, z)`` (metres).
             r_end (tuple or array-like): End position ``(x, y, z)`` (metres).
-            n_turns (float): Overall current multiplier. Defaults to 1.
+            num_turns (float): Overall current multiplier. Defaults to 1.
             name (str, optional): Identifying name for :class:`Container` lookup."""
         r_start = np.array(r_start, dtype=float)
         r_end = np.array(r_end, dtype=float)
-        zprime = r_end - r_start
+        direction = r_end - r_start
         midpoint = (r_start + r_end) / 2
-        super().__init__(r0=midpoint, zprime=zprime, n_turns=n_turns, name=name)
-        self.L = np.linalg.norm(zprime)
+        super().__init__(r0=midpoint, n=direction, num_turns=num_turns, name=name)
+        self.length = np.linalg.norm(direction)
 
-    def _B_local(self, rprime, I):
+    def _B_local(self, r_local, I):
         """Compute the magnetic field of this wire in local coordinates.
 
         Args:
-            rprime (numpy.ndarray): Position ``(xprime, yprime, zprime)`` in the
-                local frame (metres).
+            r_local (numpy.ndarray): Position ``(u, v, n)`` in the local frame
+                (metres).
             I (float): Current (amps).
 
         Returns:
-            numpy.ndarray: Field ``(Bxprime, Byprime, Bzprime)`` (tesla)."""
-        xprime, yprime, zprime = rprime
+            numpy.ndarray: Field ``(B_u, B_v, B_n)`` (tesla)."""
+        u_comp, v_comp, n_comp = r_local
         # Expression we need to call is in cylindrical coordinates.
         # field_of_current_line expects a wire from z=0 to z=L, but our local
-        # frame is centred at the midpoint, so shift by L/2:
-        rho = np.sqrt(xprime ** 2 + yprime ** 2)
-        B_phi = field_of_current_line(rho, zprime + self.L / 2, self.L, I)
-        phi = np.arctan2(yprime, xprime)
-        B_xprime = -B_phi * np.sin(phi)
-        B_yprime = B_phi * np.cos(phi)
-        return np.array([B_xprime, B_yprime, np.zeros_like(B_xprime)])
+        # frame is centred at the midpoint, so shift by length/2:
+        rho = np.sqrt(u_comp ** 2 + v_comp ** 2)
+        B_phi = field_of_current_line(rho, n_comp + self.length / 2, self.length, I)
+        phi = np.arctan2(v_comp, u_comp)
+        B_u = -B_phi * np.sin(phi)
+        B_v = B_phi * np.cos(phi)
+        return np.array([B_u, B_v, np.zeros_like(B_u)])
 
     def _local_lines(self):
-        zprime = np.array([-self.L / 2, self.L / 2], dtype=float)
-        xprime = yprime = np.zeros_like(zprime)
-        return [np.array([xprime, yprime, zprime])]
+        n_pts = np.array([-self.length / 2, self.length / 2], dtype=float)
+        u_pts = v_pts = np.zeros_like(n_pts)
+        return [np.array([u_pts, v_pts, n_pts])]
 
 
 class Arc(Container):
@@ -812,60 +810,57 @@ class Arc(Container):
         self,
         r0,
         n,
-        n_perp,
-        R,
-        phi_0,
-        phi_1,
-        n_turns=1,
-        n_segs=_DEFAULT_ARC_SEGS,
+        u,
+        radius,
+        swept_angle,
+        num_turns=1,
+        num_segs=_DEFAULT_ARC_SEGS,
         name=None,
     ):
         """A current arc forming part of a circular loop.
 
-        The arc is centred at r0 with normal vector n, spanning from angle phi_0 to
-        phi_1 (defined with respect to the direction n_perp, which must be
-        perpendicular to n). Current flows from phi_0 to phi_1, which if
-        phi_0 < phi_1, is in the positive (counterclockwise) sense with respect to
-        n. The arc is approximated as n_segs straight :class:`Line` segments.
+        The arc is centred at r0 with normal vector n. The u direction defines the
+        start of the arc, and swept_angle is the angle swept out from u. Current
+        flows in the direction of increasing angle, which if swept_angle > 0, is
+        in the positive (counterclockwise) sense with respect to n. The arc is
+        approximated as num_segs straight :class:`Line` segments.
 
         Args:
             r0 (tuple or array-like): Centre position ``(x, y, z)`` (metres).
             n (tuple or array-like): Normal vector direction. Need not be
                 normalised.
-            n_perp (tuple or array-like): Reference direction perpendicular to n,
-                defining the zero angle for phi_0 and phi_1.
-            R (float): Radius of the arc (metres).
-            phi_0 (float): Start angle (radians).
-            phi_1 (float): End angle (radians).
-            n_turns (float): Overall current multiplier. Defaults to 1.
-            n_segs (int): Number of straight line segments used to approximate the
-                arc. Defaults to 12.
+            u (tuple or array-like): Direction perpendicular to n defining the
+                start of the arc.
+            radius (float): Radius of the arc (metres).
+            swept_angle (float): Angle swept out from the u direction (radians).
+            num_turns (float): Overall current multiplier. Defaults to 1.
+            num_segs (int): Number of straight line segments used to approximate
+                the arc. Defaults to 12.
             name (str, optional): Identifying name for :class:`Container` lookup."""
-        super().__init__(r0=r0, zprime=n, xprime=n_perp, n_turns=n_turns, name=name)
-        self.R = R
-        self.phi_0 = phi_0
-        self.phi_1 = phi_1
+        super().__init__(r0=r0, n=n, u=u, num_turns=num_turns, name=name)
+        self.radius = radius
+        self.swept_angle = swept_angle
 
-        delta_phi = (phi_1 - phi_0) / n_segs
-        for i in range(n_segs):
-            phi_seg_start = phi_0 + i * delta_phi
-            phi_seg_stop = phi_0 + (i + 1) * delta_phi
-            xprime0 = R * np.cos(phi_seg_start)
-            yprime0 = R * np.sin(phi_seg_start)
-            xprime1 = R * np.cos(phi_seg_stop)
-            yprime1 = R * np.sin(phi_seg_stop)
+        delta_phi = swept_angle / num_segs
+        for i in range(num_segs):
+            phi_start = i * delta_phi
+            phi_stop = (i + 1) * delta_phi
+            u0 = radius * np.cos(phi_start)
+            v0 = radius * np.sin(phi_start)
+            u1 = radius * np.cos(phi_stop)
+            v1 = radius * np.sin(phi_stop)
 
-            r_start_seg = self._pos_to_lab((xprime0, yprime0, 0))
-            r_end_seg = self._pos_to_lab((xprime1, yprime1, 0))
-            self.add(Line(r_start_seg, r_end_seg, n_turns=n_turns))
+            r_start_seg = self._pos_to_lab((u0, v0, 0))
+            r_end_seg = self._pos_to_lab((u1, v1, 0))
+            self.add(Line(r_start_seg, r_end_seg, num_turns=num_turns))
 
     def _local_lines(self):
-        n_theta = int(round((self.phi_1 - self.phi_0) * 180 / np.pi)) + 1  # every 1 degree
-        theta = np.linspace(self.phi_0, self.phi_1, n_theta)
-        xprime = self.R * np.cos(theta)
-        yprime = self.R * np.sin(theta)
-        zprime = np.zeros_like(theta)
-        return [np.array([xprime, yprime, zprime])]
+        n_theta = int(round(self.swept_angle * 180 / np.pi)) + 1  # every 1 degree
+        theta = np.linspace(0, self.swept_angle, n_theta)
+        u_pts = self.radius * np.cos(theta)
+        v_pts = self.radius * np.sin(theta)
+        n_pts = np.zeros_like(theta)
+        return [np.array([u_pts, v_pts, n_pts])]
 
 
 class RoundCoil(Container):
@@ -873,127 +868,128 @@ class RoundCoil(Container):
         self,
         r0,
         n,
-        R_inner,
-        R_outer,
         height,
-        n_turns=1,
-        cross_sec_segs=_DEFAULT_CROSS_SEC_SEGS,
+        inner_radius,
+        outer_radius,
+        num_turns=1,
+        num_segs=_DEFAULT_CROSS_SEC_SEGS,
         name=None,
     ):
         """A round coil with rectangular cross-section.
 
         The coil is centred at r0 with normal vector n. Its finite cross-section is
-        approximated by distributing cross_sec_segs idealised :class:`Loop` elements
+        approximated by distributing num_segs idealised :class:`Loop` elements
         evenly through the rectangular cross-section.
 
         Args:
             r0 (tuple or array-like): Centre position ``(x, y, z)`` (metres).
             n (tuple or array-like): Normal vector direction. Need not be
                 normalised.
-            R_inner (float): Inner radius (metres).
-            R_outer (float): Outer radius (metres).
-            height (float): Height of the cross-section in the normal direction
-                (metres).
-            n_turns (float): Overall current multiplier. Defaults to 1.
-            cross_sec_segs (int): Number of :class:`Loop` elements used to
-                approximate the finite cross-section. Defaults to 12.
+            height (float): Height of the cross-section in the n direction (metres).
+            inner_radius (float): Inner radius (metres).
+            outer_radius (float): Outer radius (metres).
+            num_turns (float): Overall current multiplier. Defaults to 1.
+            num_segs (int): Number of :class:`Loop` elements used to approximate
+                the finite cross-section. Defaults to 12.
             name (str, optional): Identifying name for :class:`Container` lookup."""
-        super().__init__(r0=r0, zprime=n, n_turns=n_turns, name=name)
-        self.R_inner = R_inner
-        self.R_outer = R_outer
+        super().__init__(r0=r0, n=n, num_turns=num_turns, name=name)
+        self.inner_radius = inner_radius
+        self.outer_radius = outer_radius
         self.height = height
 
-        n_turns_per_seg = self.n_turns / cross_sec_segs
-        segs = _segments(R_inner, R_outer, -height / 2, height / 2, cross_sec_segs)
-        for R, zprime in segs:
-            r0_loop = self._pos_to_lab((0, 0, zprime))
-            self.add(Loop(r0_loop, n, R, n_turns=n_turns_per_seg))
+        turns_per_seg = self.num_turns / num_segs
+        segs = _segments(
+            inner_radius, outer_radius, -height / 2, height / 2, num_segs
+        )
+        for radius, n_offset in segs:
+            r0_loop = self._pos_to_lab((0, 0, n_offset))
+            self.add(Loop(r0_loop, n, radius, num_turns=turns_per_seg))
 
     def _local_surfaces(self):
         # Create arrays (in local coordinates) describing surfaces of the coil for
         # plotting:
         n_theta = 361  # every 1 degree
-        r, zprime, theta = _rectangular_tube(
-            self.R_inner,
-            self.R_outer,
+        r, n_local, theta = _rectangular_tube(
+            self.inner_radius,
+            self.outer_radius,
             -self.height / 2,
             self.height / 2,
             -np.pi,
             np.pi,
             n_theta,
         )
-        xprime = r * np.cos(theta)
-        yprime = r * np.sin(theta)
-        return [np.array([xprime, yprime, zprime])]
+        u_pts = r * np.cos(theta)
+        v_pts = r * np.sin(theta)
+        return [np.array([u_pts, v_pts, n_local])]
 
 
 class StraightSegment(Container):
     def __init__(
         self,
-        r_start,
-        r_end,
+        r0,
         n,
+        u,
+        length,
         width,
         height,
-        n_turns=1,
-        cross_sec_segs=_DEFAULT_CROSS_SEC_SEGS,
+        num_turns=1,
+        num_segs=_DEFAULT_CROSS_SEC_SEGS,
         name=None,
     ):
         """A straight conductor segment with rectangular cross-section.
 
-        Current flows from r_start to r_end. The object's centre (:attr:`r0`) is
-        the midpoint of the segment. The cross-section is oriented by the vector n
-        (perpendicular to the current direction), which defines the direction along
-        which ``height`` is measured — consistent with the meaning of n in other
-        classes such as :class:`RoundCoil` and :class:`CurvedSegment`. ``width``
-        is the extent in the remaining transverse direction. The finite
-        cross-section is approximated by distributing cross_sec_segs idealised
-        :class:`Line` elements evenly through the rectangular cross-section.
+        The segment is centred at r0 with current flowing along the u direction.
+        The cross-section lies in the v-n plane: ``width`` is measured along v,
+        ``height`` along n — consistent with the meaning of these dimensions in
+        other classes. ``length`` is the extent along u. The finite cross-section
+        is approximated by distributing num_segs idealised :class:`Line` elements
+        evenly through the rectangular cross-section.
 
         Args:
-            r_start (tuple or array-like): Start position ``(x, y, z)`` (metres).
-            r_end (tuple or array-like): End position ``(x, y, z)`` (metres).
-            n (tuple or array-like): A direction perpendicular to the current flow,
-                defining the height direction of the cross-section.
-            width (float): Extent of the cross-section perpendicular to both the
-                current direction and n (metres).
+            r0 (tuple or array-like): Centre position ``(x, y, z)`` (metres).
+            n (tuple or array-like): Normal direction, defining the height
+                direction of the cross-section. Must be perpendicular to u.
+            u (tuple or array-like): Current direction, defining the length
+                direction of the segment.
+            length (float): Extent of the segment along u (metres).
+            width (float): Extent of the cross-section along v (metres).
             height (float): Extent of the cross-section along n (metres).
-            n_turns (float): Overall current multiplier. Defaults to 1.
-            cross_sec_segs (int): Number of :class:`Line` elements used to
-                approximate the finite cross-section. Defaults to 12.
+            num_turns (float): Overall current multiplier. Defaults to 1.
+            num_segs (int): Number of :class:`Line` elements used to approximate
+                the finite cross-section. Defaults to 12.
             name (str, optional): Identifying name for :class:`Container` lookup."""
-        r_start = np.array(r_start, dtype=float)
-        r_end = np.array(r_end, dtype=float)
-        zprime = r_end - r_start
-        midpoint = (r_start + r_end) / 2
-        xprime = np.cross(n, zprime)
-        super().__init__(
-            r0=midpoint, zprime=zprime, xprime=xprime, n_turns=n_turns, name=name
-        )
+        super().__init__(r0=r0, n=n, u=u, num_turns=num_turns, name=name)
+        self.length = length
         self.width = width
         self.height = height
-        self.L = np.linalg.norm(zprime)
 
-        n_turns_per_seg = self.n_turns / cross_sec_segs
-        segs = _segments(-width / 2, width / 2, -height / 2, height / 2, cross_sec_segs)
-        for xprime, yprime in segs:
-            r_start_line = self._pos_to_lab((xprime, yprime, -self.L / 2))
-            r_end_line = self._pos_to_lab((xprime, yprime, self.L / 2))
-            self.add(Line(r_start_line, r_end_line, n_turns=n_turns_per_seg))
+        turns_per_seg = self.num_turns / num_segs
+        segs = _segments(
+            -width / 2, width / 2, -height / 2, height / 2, num_segs
+        )
+        for v_offset, n_offset in segs:
+            r_start_line = self._pos_to_lab(
+                (-self.length / 2, v_offset, n_offset)
+            )
+            r_end_line = self._pos_to_lab(
+                (self.length / 2, v_offset, n_offset)
+            )
+            self.add(Line(r_start_line, r_end_line, num_turns=turns_per_seg))
 
     def _local_surfaces(self):
-        # Create arrays (in local coordinates) describing surfaces of the segment for
-        # plotting:
-        xprime, yprime, zprime = _rectangular_tube(
+        # Create arrays (in local coordinates) describing surfaces of the segment
+        # for plotting. _rectangular_tube returns (x=cross1, y=cross2, z=long);
+        # rearrange to local (u=long, v=cross1, n=cross2):
+        v_pts, n_pts, u_pts = _rectangular_tube(
             -self.width / 2,
             self.width / 2,
             -self.height / 2,
             self.height / 2,
-            -self.L / 2,
-            self.L / 2,
+            -self.length / 2,
+            self.length / 2,
             2,
         )
-        return [np.array([xprime, yprime, zprime])]
+        return [np.array([u_pts, v_pts, n_pts])]
 
 
 class CurvedSegment(Container):
@@ -1001,75 +997,80 @@ class CurvedSegment(Container):
         self,
         r0,
         n,
-        n_perp,
-        R_inner,
-        R_outer,
+        u,
         height,
-        phi_0,
-        phi_1,
-        n_turns=1,
-        cross_sec_segs=_DEFAULT_CROSS_SEC_SEGS,
-        arc_segs=_DEFAULT_ARC_SEGS,
+        inner_radius,
+        outer_radius,
+        swept_angle,
+        num_turns=1,
+        num_segs=_DEFAULT_CROSS_SEC_SEGS,
+        num_arc_segs=_DEFAULT_ARC_SEGS,
         name=None,
     ):
 
         """A curved conductor segment with rectangular cross-section.
 
-        Forms part of a round coil centred at r0 with normal vector n, spanning
-        from angle phi_0 to phi_1 (defined with respect to n_perp, which must be
-        perpendicular to n). Current flows from phi_0 to phi_1, which if
-        phi_0 < phi_1, is in the positive (counterclockwise) sense with respect to
-        n. The finite cross-section is approximated by distributing cross_sec_segs
-        idealised :class:`Arc` elements evenly through the rectangular
-        cross-section, each itself approximated as arc_segs straight lines.
+        Forms part of a round coil centred at r0 with normal vector n. The u
+        direction defines the start of the arc, and swept_angle is the angle
+        swept out from u. Current flows in the direction of increasing angle,
+        which if swept_angle > 0, is in the positive (counterclockwise) sense
+        with respect to n. The finite cross-section is approximated by
+        distributing num_segs idealised :class:`Arc` elements evenly through the
+        rectangular cross-section, each itself approximated as num_arc_segs
+        straight lines.
 
         Args:
             r0 (tuple or array-like): Centre position ``(x, y, z)`` (metres).
             n (tuple or array-like): Normal vector direction. Need not be
                 normalised.
-            n_perp (tuple or array-like): Reference direction perpendicular to n,
-                defining the zero angle for phi_0 and phi_1.
-            R_inner (float): Inner radius (metres).
-            R_outer (float): Outer radius (metres).
-            height (float): Height of the cross-section in the normal direction
+            u (tuple or array-like): Direction perpendicular to n defining the
+                start of the arc.
+            height (float): Height of the cross-section in the n direction
                 (metres).
-            phi_0 (float): Start angle (radians).
-            phi_1 (float): End angle (radians).
-            n_turns (float): Overall current multiplier. Defaults to 1.
-            cross_sec_segs (int): Number of :class:`Arc` elements used to
-                approximate the finite cross-section. Defaults to 12.
-            arc_segs (int): Number of straight line segments per arc. Defaults
+            inner_radius (float): Inner radius (metres).
+            outer_radius (float): Outer radius (metres).
+            swept_angle (float): Angle swept out from the u direction (radians).
+            num_turns (float): Overall current multiplier. Defaults to 1.
+            num_segs (int): Number of :class:`Arc` elements used to approximate
+                the finite cross-section. Defaults to 12.
+            num_arc_segs (int): Number of straight line segments per arc. Defaults
                 to 12.
             name (str, optional): Identifying name for :class:`Container` lookup."""
-        super().__init__(r0=r0, zprime=n, xprime=n_perp, n_turns=n_turns, name=name)
-        self.R_inner = R_inner
-        self.R_outer = R_outer
+        super().__init__(r0=r0, n=n, u=u, num_turns=num_turns, name=name)
+        self.inner_radius = inner_radius
+        self.outer_radius = outer_radius
         self.height = height
-        self.phi_0 = phi_0
-        self.phi_1 = phi_1
+        self.swept_angle = swept_angle
 
-        n_turns_per_seg = self.n_turns / cross_sec_segs
-        segs = _segments(R_inner, R_outer, -height / 2, height / 2, cross_sec_segs)
-        for R, zprime in segs:
-            r0_arc = self._pos_to_lab((0, 0, zprime))
-            self.add(Arc(r0_arc, n, n_perp, R, phi_0, phi_1, n_turns_per_seg, arc_segs))
+        turns_per_seg = self.num_turns / num_segs
+        segs = _segments(
+            inner_radius, outer_radius, -height / 2, height / 2, num_segs
+        )
+        for radius, n_offset in segs:
+            r0_arc = self._pos_to_lab((0, 0, n_offset))
+            self.add(
+                Arc(
+                    r0_arc, n, u, radius, swept_angle,
+                    turns_per_seg, num_arc_segs,
+                )
+            )
 
     def _local_surfaces(self):
-        # Create arrays (in local coordinates) describing surfaces of the segment for
-        # plotting:
-        n_theta = int(round((self.phi_1 - self.phi_0) * 180 / np.pi)) + 1  # every 1 degree
-        r, zprime, theta = _rectangular_tube(
-            self.R_inner,
-            self.R_outer,
+        # Create arrays (in local coordinates) describing surfaces of the segment
+        # for plotting:
+        n_theta = int(round(self.swept_angle * 180 / np.pi)) + 1
+        r, n_local, theta = _rectangular_tube(
+            self.inner_radius,
+            self.outer_radius,
             -self.height / 2,
             self.height / 2,
-            self.phi_0,
-            self.phi_1,
+            0,
+            self.swept_angle,
             n_theta,
         )
-        xprime = r * np.cos(theta)
-        yprime = r * np.sin(theta)
-        return [np.array([xprime, yprime, zprime])]
+        u_pts = r * np.cos(theta)
+        v_pts = r * np.sin(theta)
+        return [np.array([u_pts, v_pts, n_local])]
 
 
 class RacetrackCoil(Container):
@@ -1077,125 +1078,128 @@ class RacetrackCoil(Container):
         self,
         r0,
         n,
-        n_perp,
-        width,
-        length,
+        u,
+        inner_length,
+        inner_width,
         height,
-        R_inner,
-        R_outer,
-        n_turns=1,
-        arc_segs=_DEFAULT_ARC_SEGS,
-        cross_sec_segs=_DEFAULT_CROSS_SEC_SEGS,
+        inner_radius,
+        outer_radius,
+        num_turns=1,
+        num_segs=_DEFAULT_CROSS_SEC_SEGS,
+        num_arc_segs=_DEFAULT_ARC_SEGS,
         name=None,
     ):
         """A racetrack (rounded-rectangle) coil with rectangular cross-section.
 
         Comprises four straight :class:`StraightSegment` sections and four
         90-degree :class:`CurvedSegment` corners. The coil is centred at r0 with
-        normal vector n. n_perp defines the direction along which ``width`` is
-        measured (inner-surface to inner-surface of the two straight segments
-        parallel to n_perp); ``length`` is measured in the perpendicular direction.
-        The finite cross-section is approximated by distributing cross_sec_segs
-        idealised current elements evenly through the rectangular cross-section, and
-        each curved element is further approximated as arc_segs straight lines.
+        normal vector n. u defines the direction along which ``inner_length`` is
+        measured (inner-surface to inner-surface); ``inner_width`` is measured
+        along v. ``inner_length`` is conventionally the longest direction. The
+        finite cross-section is approximated by distributing num_segs idealised
+        current elements evenly through the rectangular cross-section, and each
+        curved element is further approximated as num_arc_segs straight lines.
 
         Args:
             r0 (tuple or array-like): Centre position ``(x, y, z)`` (metres).
             n (tuple or array-like): Normal vector direction. Need not be
                 normalised.
-            n_perp (tuple or array-like): Reference direction perpendicular to n,
-                defining the width direction.
-            width (float): Inner-surface to inner-surface distance along n_perp
+            u (tuple or array-like): Direction perpendicular to n defining the
+                inner_length direction.
+            inner_length (float): Inner-surface to inner-surface distance along u
+                (metres). Conventionally the longest direction.
+            inner_width (float): Inner-surface to inner-surface distance along v
                 (metres).
-            length (float): Inner-surface to inner-surface distance perpendicular to
-                n_perp (metres).
-            height (float): Height of the cross-section in the normal direction
+            height (float): Height of the cross-section in the n direction
                 (metres).
-            R_inner (float): Inner radius of curvature of the corners (metres).
-            R_outer (float): Outer radius of curvature of the corners (metres).
-            n_turns (float): Overall current multiplier. Defaults to 1.
-            arc_segs (int): Number of straight line segments per 90-degree corner.
-                Defaults to 12.
-            cross_sec_segs (int): Number of current elements used to approximate the
+            inner_radius (float): Inner radius of curvature of the corners
+                (metres).
+            outer_radius (float): Outer radius of curvature of the corners
+                (metres).
+            num_turns (float): Overall current multiplier. Defaults to 1.
+            num_segs (int): Number of current elements used to approximate the
                 finite cross-section. Defaults to 12.
+            num_arc_segs (int): Number of straight line segments per 90-degree
+                corner. Defaults to 12.
             name (str, optional): Identifying name for :class:`Container` lookup."""
 
-        super().__init__(r0=r0, zprime=n, xprime=n_perp, n_turns=n_turns, name=name)
-        self.width = width
-        self.length = length
+        super().__init__(r0=r0, n=n, u=u, num_turns=num_turns, name=name)
+        self.inner_length = inner_length
+        self.inner_width = inner_width
         self.height = height
-        self.R_inner = R_inner
-        self.R_outer = R_outer
-        for xprime, yprime, phi_0, phi_1 in [
-            [width / 2 - R_inner, length / 2 - R_inner, 0, np.pi / 2],
-            [-width / 2 + R_inner, length / 2 - R_inner, np.pi / 2, np.pi],
-            [-width / 2 + R_inner, -length / 2 + R_inner, np.pi, 3 * np.pi / 2],
-            [width / 2 - R_inner, -length / 2 + R_inner, 3 * np.pi / 2, 2 * np.pi],
+        self.inner_radius = inner_radius
+        self.outer_radius = outer_radius
+
+        # Four 90-degree curved corners. Each corner's u vector defines the
+        # start direction of the arc:
+        il, iw, ir = inner_length, inner_width, inner_radius
+        for u_local, v_local, corner_u in [
+            (il / 2 - ir, iw / 2 - ir, self.u),
+            (-il / 2 + ir, iw / 2 - ir, self.v),
+            (-il / 2 + ir, -iw / 2 + ir, -self.u),
+            (il / 2 - ir, -iw / 2 + ir, -self.v),
         ]:
             self.add(
                 CurvedSegment(
-                    self._pos_to_lab((xprime, yprime, 0)),
+                    self._pos_to_lab((u_local, v_local, 0)),
                     n,
-                    n_perp,
-                    R_inner,
-                    R_outer,
+                    corner_u,
                     height,
-                    phi_0,
-                    phi_1,
-                    n_turns=self.n_turns,
-                    cross_sec_segs=cross_sec_segs,
-                    arc_segs=arc_segs,
+                    inner_radius,
+                    outer_radius,
+                    np.pi / 2,
+                    num_turns=self.num_turns,
+                    num_segs=num_segs,
+                    num_arc_segs=num_arc_segs,
                 )
             )
 
-        # Top and bottom bars:
-        absxprime = width / 2 - R_inner
-        absyprime = (length + R_outer - R_inner) / 2
-        if absxprime != 0:  # Exclude this segment if its length is zero:
-            for sign in [-1, +1]: # bottom, top
-                xprime0 = sign * absxprime
-                xprime1 = -sign * absxprime
-                yprime = sign * absyprime
+        # Top and bottom bars (current flows along u):
+        half_bar_u = il / 2 - ir
+        bar_v_pos = (iw + outer_radius - ir) / 2
+        if half_bar_u != 0:
+            bar_length = il - 2 * ir
+            for sign in [-1, +1]:
                 self.add(
                     StraightSegment(
-                        self._pos_to_lab((xprime0, yprime, 0)),
-                        self._pos_to_lab((xprime1, yprime, 0)),
-                        self._vector_to_lab(Z),
-                        self.R_outer - self.R_inner,
+                        self._pos_to_lab((0, sign * bar_v_pos, 0)),
+                        self.n,
+                        -sign * self.u,
+                        bar_length,
+                        outer_radius - inner_radius,
                         self.height,
-                        n_turns=n_turns,
-                        cross_sec_segs=cross_sec_segs,
+                        num_turns=num_turns,
+                        num_segs=num_segs,
                     )
                 )
 
-        # Left and right bars
-        absyprime = length / 2 - R_inner
-        absxprime = (width + R_outer - R_inner) / 2
-        if absyprime != 0:  # Exclude this segment if its length is zero:
-            for sign in [-1, +1]: # Left, right
-                yprime0 = -sign * absyprime
-                yprime1 = sign * absyprime
-                xprime = sign * absxprime
+        # Left and right bars (current flows along v):
+        half_bar_v = iw / 2 - ir
+        bar_u_pos = (il + outer_radius - ir) / 2
+        if half_bar_v != 0:
+            bar_length = iw - 2 * ir
+            for sign in [-1, +1]:
                 self.add(
                     StraightSegment(
-                        self._pos_to_lab((xprime, yprime0, 0)),
-                        self._pos_to_lab((xprime, yprime1, 0)),
-                        self._vector_to_lab(Z),
-                        self.R_outer - self.R_inner,
+                        self._pos_to_lab((sign * bar_u_pos, 0, 0)),
+                        self.n,
+                        sign * self.v,
+                        bar_length,
+                        outer_radius - inner_radius,
                         self.height,
-                        n_turns=n_turns,
-                        cross_sec_segs=cross_sec_segs,
+                        num_turns=num_turns,
+                        num_segs=num_segs,
                     )
                 )
 
 
 class CoilPair(Container):
-    def __init__(self, coiltype, r0, n, displacement, *args, **kwargs):
+    def __init__(self, coiltype, r0, n, separation, *args, **kwargs):
         """A symmetric pair of identical coils.
 
         Creates two coils of the given type, placed symmetrically about r0 along
-        the normal direction n. One coil is at ``r0 + displacement * n`` and the
-        other at ``r0 - displacement * n``. In Helmholtz configuration both coils
+        the normal direction n. One coil is at ``r0 + separation/2 * n`` and the
+        other at ``r0 - separation/2 * n``. In Helmholtz configuration both coils
         have the same normal; in anti-Helmholtz configuration the normals are
         opposite, producing a field gradient at the centre.
 
@@ -1207,7 +1211,8 @@ class CoilPair(Container):
                 two coils (metres).
             n (tuple or array-like): Normal vector direction. Need not be
                 normalised.
-            displacement (float): Distance from r0 to each coil along n (metres).
+            separation (float): Total distance between the two coils along n
+                (metres).
             *args: Additional positional arguments passed to coiltype.
             **kwargs: Additional keyword arguments passed to coiltype. Two keyword
                 arguments are intercepted and not forwarded:
@@ -1218,7 +1223,7 @@ class CoilPair(Container):
                 * **name** (str, optional) — Identifying name for :class:`Container`
                   lookup."""
         name = kwargs.pop('name', None)
-        super().__init__(r0=r0, zprime=n, name=name)
+        super().__init__(r0=r0, n=n, name=name)
         parity = kwargs.pop('parity', 'helmholtz')
         if parity not in [+1, -1]:
             if parity == 'helmholtz':
@@ -1228,7 +1233,7 @@ class CoilPair(Container):
             else:
                 msg = "parity must be 'helmholtz' or 'anti-helmholtz' (or +/-1)."
                 raise ValueError(msg)
-        for unit_vec in [self.zprime, -self.zprime]:
-            r0_coil = r0 + displacement * unit_vec
-            n_coil = self.zprime if parity == +1 else unit_vec
+        for unit_vec in [self.n, -self.n]:
+            r0_coil = r0 + (separation / 2) * unit_vec
+            n_coil = self.n if parity == +1 else unit_vec
             self.add(coiltype(r0_coil, n_coil, *args, **kwargs))
