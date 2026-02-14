@@ -8,43 +8,85 @@ import numpy as np
 import pyqtgraph.opengl as gl
 import pyqtgraph as pg
 
-from torc import StraightSegment, RacetrackCoil, RoundCoil, X, Y, Z, ORIGIN
+from torc import (
+    StraightSegment,
+    CurvedSegment,
+    RoundCoil,
+    RacetrackCoil,
+    X,
+    Y,
+    Z,
+    ORIGIN,
+)
 
 
 
-ARROW_OFFSET = 0.1
-ARROW_HEAD_LENGTH = 0.2
-DISTANCE_LABEL_OFFSET = 0.5
-POINT_LABEL_OFFSET = 0.2
-TICK_LENGTH = 1
+ARROW_OFFSET = 0.05
+ARROW_HEAD_LENGTH = 0.1
+DISTANCE_LABEL_OFFSET = 0.25
+POINT_LABEL_OFFSET = 0.125
+TICK_LENGTH = 0.25
+COORD_AXIS_SIZE = 0.5
 
 FONT = QFont("Monospace")
-FONT.setPointSize(14)
+FONT.setPointSize(13)
 
 BLACK = pg.mkColor((0, 0, 0))
 RED = pg.mkColor((255, 0, 0))
 GREEN = pg.mkColor((0, 160, 0))
 BLUE = pg.mkColor((0, 0, 255))
-PURPLE = pg.mkColor("purple")
-BLACK_SEMITRANSPARENT = pg.mkColor((0, 0, 0, 255))
+PURPLE = pg.mkColor((192, 0, 192))
+
+
+AXIS_COLOR = pg.mkColor((148, 148, 148, 128))
+AXIS_COLOR = pg.mkColor((0, 0, 0, 48))
+TICK_COLOR = BLACK
+
 
 def setup_scene(view):
     view.setCameraParams(elevation=35.264, azimuth=-135)
-    # g = gl.GLGridItem(color=pg.mkColor((0,0,0,48)))
-    # g.setSize(10, 10, 10)
-    # g.setSpacing(0.25, 0.25)
-    # view.addItem(g)
 
-def draw_line(view, r_start, r_end, width=2, color=BLACK):
+
+def draw_line(view, r_start, r_end, width=1, color=BLACK, always_on_top=True):
     pos = np.array([r_start, r_end])
+    if always_on_top:
+        kwargs = {}
+    else:
+        kwargs = {'glOptions': 'translucent'}
     line = gl.GLLinePlotItem(
         pos=pos,
         color=color,
         width=width,
-        mode='lines',
+        # mode='lines',
         antialias=True,
+        **kwargs,
     )
     view.addItem(line)
+
+def draw_arc(view, r0, r, n, theta, radii=False, width=1, color=BLACK):
+    # Arc from r0+r, sweeping angle theta about axis n
+    npts = int(round(theta * 180 / np.pi)) + 1
+    phi = np.linspace(0, theta, npts)
+    c = np.cos(phi)[:, np.newaxis]
+    s = np.sin(phi)[:, np.newaxis]
+    pts = r0 + c * r + s * np.cross(n, r) + (1 - c) * np.dot(n, r) * n
+    line = gl.GLLinePlotItem(
+        pos=pts,
+        color=color,
+        width=width,
+        # mode='lines',
+        antialias=True,
+        # glOptions='translucent',
+    )
+    view.addItem(line)
+
+    if radii:
+        draw_line(view, r0, r0 + r, width=width, color=color)
+        draw_line(view, r0, pts[-1], width=width, color=color)
+
+
+def draw_sector(view, r0, r, n, theta, width=1, color=BLACK):
+    draw_arc(view, r0, r, n, theta, radii=True, width=width, color=color)
 
 
 def draw_arrow(view, r_start, r_end, head_direction, head='end', width=2, color=BLACK):
@@ -64,9 +106,46 @@ def draw_arrow(view, r_start, r_end, head_direction, head='end', width=2, color=
 
 
 def draw_coord_axes(view):
-    draw_arrow(view, ORIGIN, X, head_direction=Y, color=RED)
-    draw_arrow(view, ORIGIN, Y, head_direction=X, color=GREEN)
-    draw_arrow(view, ORIGIN, Z, head_direction=X - Y, color=BLUE)
+
+    draw_line(view, -1000 * X, 1000 * X, color=AXIS_COLOR, always_on_top=False)
+    draw_line(view, -1000 * Y, 1000 * Y, color=AXIS_COLOR, always_on_top=False)
+    draw_line(view, -1000 * Z, 1000 * Z, color=AXIS_COLOR, always_on_top=False)
+
+    draw_arrow(view, ORIGIN, COORD_AXIS_SIZE*X , head_direction=Y, color=RED)
+    draw_arrow(view, ORIGIN, COORD_AXIS_SIZE * Y, head_direction=X, color=GREEN)
+    draw_arrow(view, ORIGIN, COORD_AXIS_SIZE * Z, head_direction=X - Y, color=BLUE)
+
+    BOLDFONT = QFont(FONT)
+    BOLDFONT.setBold(True)
+
+    textitem = gl.GLTextItem(
+        pos=(COORD_AXIS_SIZE + POINT_LABEL_OFFSET) * X,
+        text='u',
+        color=RED,
+        font=BOLDFONT,
+        alignment=Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+    )
+    view.addItem(textitem)
+
+    textitem = gl.GLTextItem(
+        pos=(COORD_AXIS_SIZE + POINT_LABEL_OFFSET) * Y,
+        text='v',
+        color=GREEN,
+        font=BOLDFONT,
+        alignment=Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
+    )
+    view.addItem(textitem)
+
+    textitem = gl.GLTextItem(
+        pos=(COORD_AXIS_SIZE + POINT_LABEL_OFFSET) * Z,
+        text='n',
+        color=BLUE,
+        font=BOLDFONT,
+        alignment=Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter,
+    )
+    view.addItem(textitem)
+
+    draw_point(view, ORIGIN, "r0")
 
 
 def draw_label(view, pos, text, color=BLACK):
@@ -80,17 +159,45 @@ def draw_label(view, pos, text, color=BLACK):
     view.addItem(textitem)
 
 
-def draw_point(view, pos, text=None, n_offset=None, size=6,color=BLACK):
+def draw_point(view, pos, text=None, label_pos='below', size=6,color=BLACK):
+
+    from OpenGL import GL
+
+    assert label_pos in ['above', 'below']
+    if label_pos == 'above':
+        n_offset = Z
+        alignment = Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignBottom
+    else:
+        n_offset = -Z
+        alignment = Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop
+
+    # Always on top no matter what
+    GLOPTIONS = {
+        GL.GL_DEPTH_TEST: False,
+        GL.GL_BLEND: False,
+        GL.GL_CULL_FACE: False,
+    }
+
     point = gl.GLScatterPlotItem(
         pos=np.array([pos]),
         size=size,
         color=color,
         pxMode=True,
-        glOptions='opaque',
+        glOptions=GLOPTIONS,
     )
     view.addItem(point)
     if text is not None:
-        draw_label(view, pos + POINT_LABEL_OFFSET *  n_offset, text)
+        textitem = gl.GLTextItem(
+            pos=pos + n_offset * POINT_LABEL_OFFSET,
+            text=text,
+            color=color,
+            font=FONT,
+            alignment=alignment,
+        )
+        view.addItem(textitem)
+
+    # if text is not None:
+    #     draw_label(view, pos + POINT_LABEL_OFFSET *  n_offset, text)
 
 
 def draw_length_indicator(
@@ -104,13 +211,13 @@ def draw_length_indicator(
     r_tick = n_tick * tick_length
 
     # draw ticks
-    draw_line(view, r_start, r_start + r_tick, color=BLACK_SEMITRANSPARENT)
-    draw_line(view, r_end, r_end + r_tick, color=BLACK_SEMITRANSPARENT)
+    draw_line(view, r_start, r_start + r_tick, color=TICK_COLOR)
+    draw_line(view, r_end, r_end + r_tick, color=TICK_COLOR)
 
     draw_arrow(
         view,
-        r_start=r_start + r_tick - TICK_LENGTH * n_tick / 2 + ARROW_OFFSET * r,
-        r_end=r_end + r_tick - TICK_LENGTH * n_tick / 2 - ARROW_OFFSET * r,
+        r_start=r_start + r_tick - ARROW_HEAD_LENGTH * n_tick + ARROW_OFFSET * r,
+        r_end=r_end + r_tick - ARROW_HEAD_LENGTH * n_tick - ARROW_OFFSET * r,
         head_direction=n_tick,
         head='both',
         color=color,
@@ -124,7 +231,7 @@ def draw_length_indicator(
 
 def draw_straightsegment():
     LENGTH = 7
-    WIDTH = 2
+    WIDTH = 2.5
     HEIGHT = 1.5
 
     R_START = -LENGTH / 2 * X
@@ -181,21 +288,101 @@ def draw_straightsegment():
     )
 
     # Label start and end
-    draw_point(view, R_START, "r_start", n_offset=-Y)
-    draw_point(view, R_END, "r_end", n_offset=-Y)
+    draw_point(view, R_START, "r_start")
+    draw_point(view, R_END, "r_end", label_pos='above')
 
     view.show()
     app.processEvents()
     img = view.grabFramebuffer()
     img.save('StraightSegment.png')
 
+def draw_curvedsegment():
+    HEIGHT = 1
+    R_INNER = 3
+    R_OUTER = 4
+    PHI0 = np.pi / 8
+    PHI1 = PHI0 + np.pi / 2
+
+    DR = R_OUTER - R_INNER
+
+    obj = CurvedSegment(
+        r0=ORIGIN,
+        n=Z,
+        n_perp=X,
+        R_inner=R_INNER,
+        R_outer=R_OUTER,
+        height=HEIGHT,
+        phi_0=PHI0,
+        phi_1=PHI1,
+    )
+
+    app, view = obj.show()
+
+    setup_scene(view)
+    draw_coord_axes(view)
+
+
+    # height
+    HEIGHT_GUIDELINE_START = (
+        -HEIGHT / 2 * Z - R_OUTER * X
+    )
+    HEIGHT_GUIDELINE_END = (
+        HEIGHT / 2 * Z - R_OUTER * X
+    )
+    draw_length_indicator(
+        view,
+        HEIGHT_GUIDELINE_START,
+        HEIGHT_GUIDELINE_END,
+        n_tick=-Y,
+        tick_length=TICK_LENGTH,
+        text='height',
+        color=BLUE,
+    )
+
+    R_ARROWS_START = HEIGHT / 2 * Z
+    draw_point(view, R_ARROWS_START)
+
+    R_INNER_ARROW_END = R_ARROWS_START + R_INNER * X
+    draw_arrow(
+        view,
+        R_ARROWS_START + ARROW_OFFSET * X,
+        R_INNER_ARROW_END - ARROW_OFFSET * X,
+        head_direction=-Y,
+        head='both',
+        color=PURPLE,
+    )
+    draw_label(
+        view,
+        pos=(R_ARROWS_START + R_INNER_ARROW_END) / 2 - DISTANCE_LABEL_OFFSET * Y,
+        text='R_inner',
+    )
+
+    R_OUTER_ARROW_END = R_ARROWS_START + R_OUTER * Y
+    draw_arrow(
+        view,
+        R_ARROWS_START + ARROW_OFFSET * Y,
+        R_OUTER_ARROW_END - ARROW_OFFSET * Y,
+        head_direction=-X,
+        head='both',
+        color=PURPLE,
+    )
+    draw_label(
+        view,
+        pos=(R_ARROWS_START + R_OUTER_ARROW_END) / 2 + DISTANCE_LABEL_OFFSET * X,
+        text='R_outer',
+    )
+
+    view.show()
+    app.processEvents()
+    img = view.grabFramebuffer()
+    img.save('RoundCoil.png')
 
 def draw_racetrackcoil():
     LENGTH = 4
     WIDTH = 6
     HEIGHT = 1
 
-    R_INNER = 1.25
+    R_INNER = 1.5
     R_OUTER = 2.25
 
     DR = R_OUTER - R_INNER
@@ -217,21 +404,21 @@ def draw_racetrackcoil():
     draw_coord_axes(view)
 
     # width
-    WIDTH_GUIDELINE_START = -WIDTH / 2 * X + HEIGHT / 2 * Z - (LENGTH / 2 - DR) * Y
-    WIDTH_GUIDELINE_END = WIDTH / 2 * X + HEIGHT / 2 * Z - (LENGTH / 2 - DR) * Y
+    WIDTH_GUIDELINE_START = -WIDTH / 2 * X + HEIGHT / 2 * Z - (LENGTH / 2 - R_INNER) * Y
+    WIDTH_GUIDELINE_END = WIDTH / 2 * X + HEIGHT / 2 * Z - (LENGTH / 2 - R_INNER) * Y
     draw_length_indicator(
         view,
         WIDTH_GUIDELINE_START,
         WIDTH_GUIDELINE_END,
         n_tick=-Y,
-        tick_length=R_OUTER + TICK_LENGTH + HEIGHT / np.sqrt(2),
+        tick_length=R_OUTER + TICK_LENGTH + HEIGHT,
         text='width',
         color=RED,
     )
 
     # length
-    LENGTH_GUIDELINE_START = -LENGTH / 2 * Y + (WIDTH / 2 - DR) * X + HEIGHT / 2 * Z
-    LENGTH_GUIDELINE_END = LENGTH / 2 * Y + (WIDTH / 2 - DR) * X + HEIGHT / 2 * Z
+    LENGTH_GUIDELINE_START = -LENGTH / 2 * Y + (WIDTH / 2 - R_INNER) * X + HEIGHT / 2 * Z
+    LENGTH_GUIDELINE_END = LENGTH / 2 * Y + (WIDTH / 2 - R_INNER) * X + HEIGHT / 2 * Z
     draw_length_indicator(
         view,
         LENGTH_GUIDELINE_START,
@@ -259,40 +446,67 @@ def draw_racetrackcoil():
         color=BLUE,
     )
 
+    # Radii
+
+   
+
     R_ARROWS_START = HEIGHT / 2 * Z + LENGTH / 2 * Y - WIDTH / 2 * X - R_INNER * (Y - X)
     draw_point(view, R_ARROWS_START)
 
-    R_INNER_ARROW_END = R_ARROWS_START + R_INNER * Y
-    draw_arrow(
+    draw_sector(view, R_ARROWS_START, R_INNER * Y, Z, np.pi / 2, color=TICK_COLOR)
+    draw_sector(view, R_ARROWS_START, R_OUTER * Y, Z, np.pi / 2, color=TICK_COLOR)
+
+    R_INNER_ARROW_END = R_ARROWS_START - R_INNER * X
+    R_OUTER_ARROW_END = R_ARROWS_START + R_OUTER * Y
+
+    draw_length_indicator(
         view,
-        R_ARROWS_START + ARROW_OFFSET * Y,
-        R_INNER_ARROW_END - ARROW_OFFSET * Y,
-        head_direction=X,
-        head='both',
-        color=PURPLE,
-    )
-    draw_label(
-        view,
-        pos=(R_ARROWS_START + R_INNER_ARROW_END) / 2 + DISTANCE_LABEL_OFFSET * X,
+        R_ARROWS_START,
+        R_INNER_ARROW_END,
+        n_tick=-Y,
+        tick_length=TICK_LENGTH,
         text='R_inner',
-    )
-
-    R_OUTER_ARROW_END = R_ARROWS_START - R_OUTER * X
-    draw_arrow(
-        view,
-        R_ARROWS_START - ARROW_OFFSET * X,
-        R_OUTER_ARROW_END + ARROW_OFFSET * X,
-        head_direction=Y,
-        head='both',
         color=PURPLE,
     )
-    draw_label(
+
+    draw_length_indicator(
         view,
-        pos=(R_ARROWS_START + R_OUTER_ARROW_END) / 2 - DISTANCE_LABEL_OFFSET * Y,
+        R_ARROWS_START,
+        R_OUTER_ARROW_END,
+        n_tick=X,
+        tick_length=TICK_LENGTH,
         text='R_outer',
+        color=PURPLE,
     )
 
-    draw_point(view, ORIGIN, "r0", n_offset=-Y)
+    # draw_arrow(
+    #     view,
+    #     R_ARROWS_START + ARROW_OFFSET * Y,
+    #     R_INNER_ARROW_END - ARROW_OFFSET * Y,
+    #     head_direction=X,
+    #     head='both',
+    #     color=PURPLE,
+    # )
+    # draw_label(
+    #     view,
+    #     pos=(R_ARROWS_START + R_INNER_ARROW_END) / 2 + DISTANCE_LABEL_OFFSET * X,
+    #     text='R_inner',
+    # )
+
+    # R_OUTER_ARROW_END = R_ARROWS_START - R_OUTER * X
+    # draw_arrow(
+    #     view,
+    #     R_ARROWS_START - ARROW_OFFSET * X,
+    #     R_OUTER_ARROW_END + ARROW_OFFSET * X,
+    #     head_direction=Y,
+    #     head='both',
+    #     color=PURPLE,
+    # )
+    # draw_label(
+    #     view,
+    #     pos=(R_ARROWS_START + R_OUTER_ARROW_END) / 2 - DISTANCE_LABEL_OFFSET * Y,
+    #     text='R_outer',
+    # )
 
     view.show()
     app.processEvents()
@@ -371,8 +585,6 @@ def draw_roundcoil():
         text='R_outer',
     )
 
-    draw_point(view, ORIGIN, "r0", n_offset=-Y)
-
     view.show()
     app.processEvents()
     img = view.grabFramebuffer()
@@ -380,6 +592,8 @@ def draw_roundcoil():
 
 
 # draw_straightsegment()
-# draw_racetrackcoil()
-draw_roundcoil()
+draw_racetrackcoil()
+# draw_roundcoil()
+# draw_curvedsegment()
+
 
