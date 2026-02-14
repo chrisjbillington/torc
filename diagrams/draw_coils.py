@@ -31,7 +31,11 @@ COORD_AXIS_SIZE = 0.5
 FONT = QFont("Monospace")
 FONT.setPointSize(13)
 
+BOLDFONT = QFont(FONT)
+BOLDFONT.setBold(True)
+
 BLACK = pg.mkColor((0, 0, 0))
+WHITE = pg.mkColor((255, 255, 255))
 RED = pg.mkColor((255, 0, 0))
 GREEN = pg.mkColor((0, 160, 0))
 BLUE = pg.mkColor((0, 0, 255))
@@ -44,7 +48,9 @@ TICK_COLOR = BLACK
 
 
 def setup_scene(view):
-    view.setCameraParams(elevation=35.264, azimuth=-135)
+    # view.setCameraParams(elevation=35.264, azimuth=-135)
+    # view.setBackgroundColor('lightgrey')
+    pass
 
 
 def draw_line(view, r_start, r_end, width=1, color=BLACK, always_on_top=True):
@@ -115,9 +121,6 @@ def draw_coord_axes(view):
     draw_arrow(view, ORIGIN, COORD_AXIS_SIZE * Y, head_direction=X, color=GREEN)
     draw_arrow(view, ORIGIN, COORD_AXIS_SIZE * Z, head_direction=X - Y, color=BLUE)
 
-    BOLDFONT = QFont(FONT)
-    BOLDFONT.setBold(True)
-
     textitem = gl.GLTextItem(
         pos=(COORD_AXIS_SIZE + POINT_LABEL_OFFSET) * X,
         text='u',
@@ -147,14 +150,19 @@ def draw_coord_axes(view):
 
     draw_point(view, ORIGIN, "r0")
 
-
-def draw_label(view, pos, text, color=BLACK):
+def draw_label(view, pos, text, alignment='left', color=BLACK):
+    if alignment == 'left':
+        alignflags = Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
+    elif alignment == 'right':
+        alignflags = Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+    else:
+        raise ValueError(alignment)
     textitem = gl.GLTextItem(
         pos=pos,
         text=text,
         color=color,
         font=FONT,
-        alignment=Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+        alignment=alignflags,
     )
     view.addItem(textitem)
 
@@ -196,12 +204,8 @@ def draw_point(view, pos, text=None, label_pos='below', size=6,color=BLACK):
         )
         view.addItem(textitem)
 
-    # if text is not None:
-    #     draw_label(view, pos + POINT_LABEL_OFFSET *  n_offset, text)
-
-
 def draw_length_indicator(
-    view, r_start, r_end, n_tick, tick_length, text, color
+    view, r_start, r_end, n_tick, tick_length, text, color, label_alignment='left'
 ):
     r = r_end - r_start
     r /= np.linalg.norm(r)
@@ -226,6 +230,7 @@ def draw_length_indicator(
         view,
         pos=(r_start + r_end) / 2 + r_tick - TICK_LENGTH * n_tick / 2 + DISTANCE_LABEL_OFFSET * n_tick,
         text=text,
+        alignment=label_alignment,
     )
 
 
@@ -233,6 +238,9 @@ def draw_straightsegment():
     LENGTH = 7
     WIDTH = 2.5
     HEIGHT = 1.5
+
+    HEIGHT = 1.75
+    WIDTH = 1.5
 
     R_START = -LENGTH / 2 * X
     R_END = LENGTH / 2 * X
@@ -296,11 +304,12 @@ def draw_straightsegment():
     img = view.grabFramebuffer()
     img.save('StraightSegment.png')
 
+
 def draw_curvedsegment():
-    HEIGHT = 1
+    HEIGHT = 2
     R_INNER = 3
-    R_OUTER = 4
-    PHI0 = np.pi / 8
+    R_OUTER = 4.5
+    PHI0 = np.pi / 2
     PHI1 = PHI0 + np.pi / 2
 
     DR = R_OUTER - R_INNER
@@ -323,12 +332,8 @@ def draw_curvedsegment():
 
 
     # height
-    HEIGHT_GUIDELINE_START = (
-        -HEIGHT / 2 * Z - R_OUTER * X
-    )
-    HEIGHT_GUIDELINE_END = (
-        HEIGHT / 2 * Z - R_OUTER * X
-    )
+    HEIGHT_GUIDELINE_START = -HEIGHT / 2 * Z - R_OUTER * X
+    HEIGHT_GUIDELINE_END = HEIGHT / 2 * Z - R_OUTER * X
     draw_length_indicator(
         view,
         HEIGHT_GUIDELINE_START,
@@ -339,43 +344,46 @@ def draw_curvedsegment():
         color=BLUE,
     )
 
+    # Radii
     R_ARROWS_START = HEIGHT / 2 * Z
     draw_point(view, R_ARROWS_START)
 
-    R_INNER_ARROW_END = R_ARROWS_START + R_INNER * X
-    draw_arrow(
+    draw_sector(view, R_ARROWS_START, R_INNER * Y, Z, np.pi / 2, color=TICK_COLOR)
+    draw_sector(view, R_ARROWS_START, R_OUTER * Y, Z, np.pi / 2, color=TICK_COLOR)
+
+    R_INNER_ARROW_END = R_ARROWS_START - R_INNER * X
+    R_OUTER_ARROW_END = R_ARROWS_START + R_OUTER * Y
+
+    draw_length_indicator(
         view,
-        R_ARROWS_START + ARROW_OFFSET * X,
-        R_INNER_ARROW_END - ARROW_OFFSET * X,
-        head_direction=-Y,
-        head='both',
-        color=PURPLE,
-    )
-    draw_label(
-        view,
-        pos=(R_ARROWS_START + R_INNER_ARROW_END) / 2 - DISTANCE_LABEL_OFFSET * Y,
+        R_ARROWS_START,
+        R_INNER_ARROW_END,
+        n_tick=-Y,
+        tick_length=TICK_LENGTH,
+        # n_tick=Y,
+        # tick_length=R_OUTER + TICK_LENGTH,
         text='R_inner',
+        color=PURPLE,
+        # label_alignment='right'
     )
 
-    R_OUTER_ARROW_END = R_ARROWS_START + R_OUTER * Y
-    draw_arrow(
+    draw_length_indicator(
         view,
-        R_ARROWS_START + ARROW_OFFSET * Y,
-        R_OUTER_ARROW_END - ARROW_OFFSET * Y,
-        head_direction=-X,
-        head='both',
-        color=PURPLE,
-    )
-    draw_label(
-        view,
-        pos=(R_ARROWS_START + R_OUTER_ARROW_END) / 2 + DISTANCE_LABEL_OFFSET * X,
+        R_ARROWS_START,
+        R_OUTER_ARROW_END,
+        n_tick=X,
+        tick_length=TICK_LENGTH,
+        # n_tick=-X,
+        # tick_length=R_OUTER + TICK_LENGTH,
         text='R_outer',
+        color=PURPLE,
+        # label_alignment='right'
     )
 
     view.show()
     app.processEvents()
     img = view.grabFramebuffer()
-    img.save('RoundCoil.png')
+    img.save('CurvedSegment.png')
 
 def draw_racetrackcoil():
     LENGTH = 4
@@ -447,9 +455,6 @@ def draw_racetrackcoil():
     )
 
     # Radii
-
-   
-
     R_ARROWS_START = HEIGHT / 2 * Z + LENGTH / 2 * Y - WIDTH / 2 * X - R_INNER * (Y - X)
     draw_point(view, R_ARROWS_START)
 
@@ -465,8 +470,11 @@ def draw_racetrackcoil():
         R_INNER_ARROW_END,
         n_tick=-Y,
         tick_length=TICK_LENGTH,
+        # n_tick=Y,
+        # tick_length=R_OUTER + TICK_LENGTH,
         text='R_inner',
         color=PURPLE,
+        # label_alignment='right'
     )
 
     draw_length_indicator(
@@ -475,38 +483,12 @@ def draw_racetrackcoil():
         R_OUTER_ARROW_END,
         n_tick=X,
         tick_length=TICK_LENGTH,
+        # n_tick=-X,
+        # tick_length=R_OUTER + TICK_LENGTH,
         text='R_outer',
         color=PURPLE,
+        # label_alignment='right'
     )
-
-    # draw_arrow(
-    #     view,
-    #     R_ARROWS_START + ARROW_OFFSET * Y,
-    #     R_INNER_ARROW_END - ARROW_OFFSET * Y,
-    #     head_direction=X,
-    #     head='both',
-    #     color=PURPLE,
-    # )
-    # draw_label(
-    #     view,
-    #     pos=(R_ARROWS_START + R_INNER_ARROW_END) / 2 + DISTANCE_LABEL_OFFSET * X,
-    #     text='R_inner',
-    # )
-
-    # R_OUTER_ARROW_END = R_ARROWS_START - R_OUTER * X
-    # draw_arrow(
-    #     view,
-    #     R_ARROWS_START - ARROW_OFFSET * X,
-    #     R_OUTER_ARROW_END + ARROW_OFFSET * X,
-    #     head_direction=Y,
-    #     head='both',
-    #     color=PURPLE,
-    # )
-    # draw_label(
-    #     view,
-    #     pos=(R_ARROWS_START + R_OUTER_ARROW_END) / 2 - DISTANCE_LABEL_OFFSET * Y,
-    #     text='R_outer',
-    # )
 
     view.show()
     app.processEvents()
@@ -515,9 +497,9 @@ def draw_racetrackcoil():
 
 
 def draw_roundcoil():
-    HEIGHT = 1
+    HEIGHT = 1.75
     R_INNER = 3
-    R_OUTER = 4
+    R_OUTER = 4.5
 
     DR = R_OUTER - R_INNER
 
@@ -534,14 +516,9 @@ def draw_roundcoil():
     setup_scene(view)
     draw_coord_axes(view)
 
-
     # height
-    HEIGHT_GUIDELINE_START = (
-        -HEIGHT / 2 * Z - R_OUTER * X
-    )
-    HEIGHT_GUIDELINE_END = (
-        HEIGHT / 2 * Z - R_OUTER * X
-    )
+    HEIGHT_GUIDELINE_START = -HEIGHT / 2 * Z - R_OUTER * X
+    HEIGHT_GUIDELINE_END = HEIGHT / 2 * Z - R_OUTER * X
     draw_length_indicator(
         view,
         HEIGHT_GUIDELINE_START,
@@ -552,37 +529,39 @@ def draw_roundcoil():
         color=BLUE,
     )
 
+    # Radii
     R_ARROWS_START = HEIGHT / 2 * Z
     draw_point(view, R_ARROWS_START)
 
+    draw_sector(view, R_ARROWS_START, R_INNER * X, Z, np.pi / 2, color=TICK_COLOR)
+    draw_sector(view, R_ARROWS_START, R_OUTER * X, Z, np.pi / 2, color=TICK_COLOR)
+
     R_INNER_ARROW_END = R_ARROWS_START + R_INNER * X
-    draw_arrow(
+    draw_length_indicator(
         view,
-        R_ARROWS_START + ARROW_OFFSET * X,
-        R_INNER_ARROW_END - ARROW_OFFSET * X,
-        head_direction=-Y,
-        head='both',
-        color=PURPLE,
-    )
-    draw_label(
-        view,
-        pos=(R_ARROWS_START + R_INNER_ARROW_END) / 2 - DISTANCE_LABEL_OFFSET * Y,
+        R_ARROWS_START,
+        R_INNER_ARROW_END,
+        n_tick=-Y,
+        tick_length=TICK_LENGTH,
+        # n_tick=Y,
+        # tick_length=R_OUTER + TICK_LENGTH,
         text='R_inner',
+        color=PURPLE,
+        # label_alignment='right'
     )
 
     R_OUTER_ARROW_END = R_ARROWS_START + R_OUTER * Y
-    draw_arrow(
+    draw_length_indicator(
         view,
-        R_ARROWS_START + ARROW_OFFSET * Y,
-        R_OUTER_ARROW_END - ARROW_OFFSET * Y,
-        head_direction=-X,
-        head='both',
-        color=PURPLE,
-    )
-    draw_label(
-        view,
-        pos=(R_ARROWS_START + R_OUTER_ARROW_END) / 2 + DISTANCE_LABEL_OFFSET * X,
+        R_ARROWS_START,
+        R_OUTER_ARROW_END,
+        n_tick=-X,
+        tick_length=TICK_LENGTH,
+        # n_tick=-X,
+        # tick_length=R_OUTER + TICK_LENGTH,
         text='R_outer',
+        color=PURPLE,
+        label_alignment='right'
     )
 
     view.show()
@@ -592,8 +571,8 @@ def draw_roundcoil():
 
 
 # draw_straightsegment()
-draw_racetrackcoil()
+# draw_racetrackcoil()
 # draw_roundcoil()
-# draw_curvedsegment()
+draw_curvedsegment()
 
 

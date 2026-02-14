@@ -603,7 +603,7 @@ class CurrentObject(object):
 
         # Camera and scene params:
         view.resize(VIEW_WIDTH, VIEW_HEIGHT)
-        view.setBackgroundColor('lightgrey')
+        view.setBackgroundColor('white')
 
         view.opts['fov'] = VIEW_FOV
         view.setCameraParams(elevation=35.264, azimuth=-135)
