@@ -58,10 +58,6 @@ def rotate_vector(v, axis, angle):
     return c * v + s * np.cross(n, v) + (1 - c) * np.dot(n, v) * n
 
 
-def setup_scene(view):
-    draw_coord_axes(view)
-
-
 def draw_line(view, r_start, r_end, width=1, color=BLACK, always_on_top=True):
     pos = np.array([r_start, r_end])
     if always_on_top:
@@ -321,8 +317,7 @@ def draw_StraightSegment():
     )
 
     view = obj.show(blocking=False)
-
-    setup_scene(view)
+    draw_coord_axes(view, y=None)
 
     WIDTH_GUIDELINE_START = -WIDTH / 2 * Y + HEIGHT / 2 * Z + LENGTH / 2 * X
     WIDTH_GUIDELINE_END = WIDTH / 2 * Y + HEIGHT / 2 * Z + LENGTH / 2 * X
@@ -401,8 +396,7 @@ def draw_CurvedSegment():
     )
 
     view = obj.show(blocking=False)
-
-    setup_scene(view)
+    draw_coord_axes(view, y=None)
 
     # height
     HEIGHT_GUIDELINE_START = -HEIGHT / 2 * Z + R_OUTER * X
@@ -499,8 +493,7 @@ def draw_RacetrackCoil():
     )
 
     view = obj.show(blocking=False)
-
-    setup_scene(view)
+    draw_coord_axes(view, y=None)
 
     # width
     WIDTH_GUIDELINE_START = -LENGTH / 2 * X + HEIGHT / 2 * Z - (WIDTH / 2 - R_INNER) * Y
@@ -576,19 +569,13 @@ def draw_RacetrackCoil():
     )
 
     # Current direction
-    I_CORNER = (
-        (LENGTH / 2 - R_INNER) * X
-        + (WIDTH / 2 - R_INNER) * Y
-        + (HEIGHT / 2 + CURRENT_INDICATOR_OFFSET) * Z
-    )
-    I_R = R_OUTER * rotate_vector(X, Z, np.pi / 8)
-    draw_arc(view, I_CORNER, I_R, Z, 3 * np.pi / 8, width=2, color=ORANGEYELLOW)
-    I_ARC_END = I_CORNER + R_OUTER * Y
-    I_ARROW_END = I_ARC_END - (LENGTH - 2 * R_INNER) * X
-    draw_arrow(view, I_ARC_END, I_ARROW_END, head_direction=Y, color=ORANGEYELLOW)
+    I_Y = (WIDTH / 2 + DR) * Y + (HEIGHT / 2 + CURRENT_INDICATOR_OFFSET) * Z
+    I_START = (LENGTH / 2 - R_INNER) * X + I_Y
+    I_END = -(LENGTH / 2 - R_INNER) * X + I_Y
+    draw_arrow(view, I_START, I_END, head_direction=Y, color=ORANGEYELLOW)
     draw_label(
         view,
-        I_ARC_END + DISTANCE_LABEL_OFFSET * Y,
+        (I_START + I_END) / 2 + DISTANCE_LABEL_OFFSET * Y,
         "I",
         alignment='right',
         color=ORANGEYELLOW,
@@ -614,8 +601,7 @@ def draw_RoundCoil():
     )
 
     view = obj.show(blocking=False)
-
-    setup_scene(view)
+    draw_coord_axes(view, x=None, y=None)
 
     # height
     HEIGHT_GUIDELINE_START = -HEIGHT / 2 * Z - R_OUTER * X
@@ -682,8 +668,7 @@ def draw_Line():
     obj = Line(r_start=-LENGTH / 2 * Z, r_end=LENGTH / 2 * Z)
 
     view = obj.show(surfaces=False, lines=True, blocking=False)
-
-    setup_scene(view)
+    draw_coord_axes(view, x=None, y=None)
 
     # length
     LENGTH_GUIDELINE_START = -LENGTH / 2 * Z
@@ -731,8 +716,7 @@ def draw_Arc():
     )
 
     view = obj.show(surfaces=False, lines=True, blocking=False)
-
-    setup_scene(view)
+    draw_coord_axes(view, y=None)
 
     # Radius
     draw_sector(view, ORIGIN, R * X, Z, SWEPT_ANGLE, color=TICK_COLOR)
@@ -750,7 +734,7 @@ def draw_Arc():
     )
 
     # swept angle
-    SWEPT_ANGLE_ARC_RADIUS = 1
+    SWEPT_ANGLE_ARC_RADIUS = 2
     draw_arc_arrow(
         view, ORIGIN, SWEPT_ANGLE_ARC_RADIUS * X, Z, SWEPT_ANGLE, color=BLACK
     )
@@ -787,7 +771,7 @@ def draw_Loop():
     )
 
     view = obj.show(surfaces=False, lines=True, blocking=False)
-    setup_scene(view)
+    draw_coord_axes(view, x=None, y=None)
 
     # Radius
     R_END = R * X
@@ -841,7 +825,8 @@ def draw_CoilPair():
     )
 
     view = obj.show(blocking=False)
-    setup_scene(view)
+    view.opts['distance'] *= 1.1  # zoom out a bit to fit current indicators
+    draw_coord_axes(view, y=None)
 
     # Separation indicator
     SEP_XY = (LENGTH / 2 - R_INNER) * X - (WIDTH / 2 + DR) * Y
@@ -859,7 +844,13 @@ def draw_CoilPair():
 
     # Coordinate axes at each coil center
     TOP_CENTER = SEPARATION / 2 * Z
-    draw_coord_axes(view, y=None, origin=TOP_CENTER, guidelines=False, point_label=None)
+    draw_coord_axes(
+        view,
+        y=None,
+        origin=TOP_CENTER,
+        guidelines=False,
+        point_label=None,
+    )
 
     BOTTOM_CENTER = -SEPARATION / 2 * Z
     draw_coord_axes(
@@ -875,38 +866,18 @@ def draw_CoilPair():
     )
 
     # Current direction indicators on both coils
-    # Same geometry, offset by ±SEPARATION/2 in Z. Top coil has arrowhead on the
-    # straight segment; bottom coil has arrowhead at the start of the arc.
-    I_CORNER_XY = (LENGTH / 2 - R_INNER) * X + (WIDTH / 2 - R_INNER) * Y
-    I_R = R_OUTER * rotate_vector(X, Z, np.pi / 8)
-    I_STRAIGHT = (LENGTH - 2 * R_INNER) * X
+    I_Y = (WIDTH / 2 + DR) * Y + (HEIGHT / 2 + CURRENT_INDICATOR_OFFSET / 2) * Z
+    I_LEFT = -(LENGTH / 2 - R_INNER) * X + I_Y
+    I_RIGHT = (LENGTH / 2 - R_INNER) * X + I_Y
 
-    for sign, arrow_on_line, arc_head in [(+1, True, None), (-1, False, 'start')]:
-        I_Z = (sign * SEPARATION / 2 + HEIGHT / 2 + CURRENT_INDICATOR_OFFSET / 2) * Z
-        I_CORNER = I_CORNER_XY + I_Z
-
-        if arc_head is not None:
-            draw_arc_arrow(
-                view, I_CORNER, I_R, Z, 3 * np.pi / 8,
-                head=arc_head, width=2, color=ORANGEYELLOW,
-            )
-        else:
-            draw_arc(
-                view, I_CORNER, I_R, Z, 3 * np.pi / 8, width=2, color=ORANGEYELLOW
-            )
-
-        I_ARC_END = I_CORNER + R_OUTER * Y
-        I_LINE_END = I_ARC_END - I_STRAIGHT
-        if arrow_on_line:
-            draw_arrow(
-                view, I_ARC_END, I_LINE_END, head_direction=Y, color=ORANGEYELLOW
-            )
-        else:
-            draw_line(view, I_ARC_END, I_LINE_END, width=2, color=ORANGEYELLOW)
-
+    for sign, direction in [(+1, -1), (-1, +1)]:
+        I_Z = sign * SEPARATION / 2 * Z
+        I_START = (I_RIGHT if direction == -1 else I_LEFT) + I_Z
+        I_END = (I_LEFT if direction == -1 else I_RIGHT) + I_Z
+        draw_arrow(view, I_START, I_END, head_direction=Y, color=ORANGEYELLOW)
         draw_label(
             view,
-            I_ARC_END + DISTANCE_LABEL_OFFSET * Y,
+            (I_START + I_END) / 2 + DISTANCE_LABEL_OFFSET * Y,
             "I",
             alignment='right',
             color=ORANGEYELLOW,
@@ -916,9 +887,9 @@ def draw_CoilPair():
     # Parity label
     draw_label(
         view,
-        -(SEPARATION / 2 + COORD_AXIS_SIZE + 3 * POINT_LABEL_OFFSET) * Z,
-        "parity = 'anti-helmholtz'",
-        alignment='top',
+        -(X - Y)/np.sqrt(2),
+        "(parity='anti-helmholtz)'",
+        alignment='right',
     )
 
     save_image(view, 'CoilPair.png')
@@ -929,11 +900,11 @@ if __name__ == '__main__':
     import os
     os.environ["QT_LOGGING_RULES"] = "qt.qpa.wayland.textinput=false"
 
-    # draw_StraightSegment()
-    # draw_RacetrackCoil()
-    # draw_RoundCoil()
-    # draw_CurvedSegment()
-    # draw_Line()
-    # draw_Arc()
-    # draw_Loop()
+    draw_StraightSegment()
+    draw_RacetrackCoil()
+    draw_RoundCoil()
+    draw_CurvedSegment()
+    draw_Line()
+    draw_Arc()
+    draw_Loop()
     draw_CoilPair()
