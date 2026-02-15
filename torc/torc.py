@@ -285,30 +285,36 @@ class CurrentObject(object):
 
         The object is centred at position r0 with a right-handed local coordinate
         system (u, v, n) defined by the primary axis n and secondary axis u.
-        The third axis v is computed as n x u. The two provided axes do not need to
+        The third axis v is computed as n × u. The two provided axes do not need to
         be normalised (they will be normalised automatically), but must be orthogonal.
 
         Args:
             r0 (tuple or array-like): Position ``(x, y, z)`` of the object's centre
                 (metres).
-            n (tuple or array-like): Primary axis direction in lab coordinates. For
-                planar objects (coils, arcs), this is the normal to the plane. Need
-                not be normalised.
-            u (tuple or array-like, optional): Secondary axis direction in lab
-                coordinates, must be orthogonal to n. If ``None`` (the default), a
-                random orthogonal direction is chosen — suitable for objects with
+            n (tuple or array-like): Primary axis direction (nx, ny, nz) in lab
+                coordinates. For planar objects (coils, arcs), this is the normal to
+                the plane. Need not be normalised.
+            u (tuple or array-like, optional): Secondary axis direction (ux, uy, uz)
+                in lab coordinates, must be orthogonal to n. If ``None`` (the default),
+                an arbitrary orthogonal direction is chosen, suitable for objects with
                 rotational symmetry.
             num_turns (float): Overall multiplier for the current used in field
                 calculations. Defaults to 1.
             name (str, optional): An identifying name, used for lookup in a
                 :class:`Container`."""
+
         #: Centre position ``(x, y, z)`` in the lab frame (metres).
         self.r0 = np.array(r0)
+
         #: Unit vector for the local n axis in lab coordinates.
         self.n = _unit(n)
+
         if u is None:
-            # A random vector that is orthogonal to n:
-            u = _cross(np.random.randn(3), n)
+            # An arbitrary vector orthogonal to n:
+            e = np.zeros(3)
+            e[np.argmin(np.abs(self.n))] = 1.0
+            u = _cross(n, e)
+
         #: Unit vector for the local u axis in lab coordinates.
         self.u = _unit(u)
 
@@ -316,15 +322,17 @@ class CurrentObject(object):
             raise ValueError("Primary and secondary axes of object not orthogonal")
 
         #: Unit vector for the local v axis in lab coordinates (computed as
-        #: n x u).
+        #: n × u).
         self.v = _cross(self.n, self.u)
+
+        #: Overall current multiplier used in field calculations.
+        self.num_turns = num_turns
+
+        #: Identifying name for lookup in a :class:`Container`, or ``None``.
+        self.name = name
 
         # Rotation matrix from local frame to lab frame:
         self._Q_rot = np.stack([self.u, self.v, self.n], axis=1)
-        #: Overall current multiplier used in field calculations.
-        self.num_turns = num_turns
-        #: Identifying name for lookup in a :class:`Container`, or ``None``.
-        self.name = name
 
     @property
     def x(self):
