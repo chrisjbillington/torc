@@ -1256,21 +1256,24 @@ class CoilPair(Container):
             **kwargs: Additional keyword arguments passed to coiltype. Two keyword
                 arguments are intercepted and not forwarded:
 
-                * **parity** (int or str) — ``1``, ``'helmholtz'`` (default) for
-                  same-direction normals, or ``-1``, ``'anti-helmholtz'`` for
-                  opposite normals.
+                * **parity** (int or str) — ``1``, ``'Helmholtz'`` (default,
+                  case-insensitive) for same-direction normals, or ``-1``,
+                  ``'anti-Helmholtz'`` (case-insensitive) for opposite normals.
                 * **name** (str, optional) — Identifying name for :class:`Container`
                   lookup."""
         name = kwargs.pop('name', None)
         super().__init__(r0=r0, n=n, name=name)
         parity = kwargs.pop('parity', 'helmholtz')
         if parity not in [+1, -1]:
-            if parity == 'helmholtz':
+            if parity.lower() == 'helmholtz':
                 parity = +1
-            elif parity == 'anti-helmholtz':
+            elif parity.lower() == 'anti-helmholtz':
                 parity = -1
             else:
-                msg = "parity must be 'helmholtz' or 'anti-helmholtz' (or +/-1)."
+                msg = (
+                    "parity must be 'Helmholtz' or 'anti-Helmholtz' "
+                    + "(case insensitive) or +/-1."
+                )
                 raise ValueError(msg)
         for unit_vec in [self.n, -self.n]:
             r0_coil = r0 + (separation / 2) * unit_vec

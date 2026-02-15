@@ -34,7 +34,7 @@ from torc import (
 ARROW_OFFSET = 0.05
 ARROW_HEAD_LENGTH = 0.125
 DISTANCE_LABEL_OFFSET = 0.25
-POINT_LABEL_OFFSET = 0.05
+POINT_LABEL_OFFSET = 0.075
 TICK_LENGTH = 0.25
 COORD_AXIS_SIZE = 0.5
 CURRENT_INDICATOR_OFFSET = 1
@@ -842,7 +842,7 @@ def draw_CoilPair():
         height=HEIGHT,
         inner_radius=R_INNER,
         outer_radius=R_OUTER,
-        parity='anti-helmholtz',
+        parity='anti-Helmholtz',
     )
 
     view = obj.show(blocking=False)
@@ -910,7 +910,7 @@ def draw_CoilPair():
     draw_label(
         view,
         -(X - Y)/np.sqrt(2),
-        "(parity='anti-helmholtz)'",
+        "(parity='anti-Helmholtz)'",
         alignment='right',
     )
 
