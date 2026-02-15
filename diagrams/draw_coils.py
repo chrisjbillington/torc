@@ -1,8 +1,8 @@
 import sys
 sys.path.insert(0, '..')
 
-from PyQt6.QtGui import QFont
-from PyQt6.QtCore import Qt
+from pyqtgraph.Qt.QtGui import QFont
+from pyqtgraph.Qt.QtCore import Qt
 
 import numpy as np
 import pyqtgraph.opengl as gl
@@ -290,7 +290,7 @@ def draw_StraightSegment():
         height=HEIGHT,
     )
 
-    app, view = obj.show()
+    view = obj.show(blocking=False)
 
     setup_scene(view)
     draw_coord_axes(view)
@@ -332,7 +332,7 @@ def draw_StraightSegment():
         color=BLUE,
     )
 
-    view.show()
+    app = pg.mkQApp()
     app.processEvents()
     img = view.grabFramebuffer()
     img.save('StraightSegment.png')
@@ -356,7 +356,7 @@ def draw_CurvedSegment():
         swept_angle=SWEPT_ANGLE,
     )
 
-    app, view = obj.show()
+    view = obj.show(blocking=False)
 
     setup_scene(view)
     draw_coord_axes(view)
@@ -420,7 +420,7 @@ def draw_CurvedSegment():
         alignment='bottom',
     )
 
-    view.show()
+    app = pg.mkQApp()
     app.processEvents()
     img = view.grabFramebuffer()
     img.save('CurvedSegment.png')
@@ -447,7 +447,7 @@ def draw_RacetrackCoil():
         outer_radius=R_OUTER,
     )
 
-    app, view = obj.show()
+    view = obj.show(blocking=False)
 
     setup_scene(view)
     draw_coord_axes(view)
@@ -531,7 +531,7 @@ def draw_RacetrackCoil():
         # label_alignment='right'
     )
 
-    view.show()
+    app = pg.mkQApp()
     app.processEvents()
     img = view.grabFramebuffer()
     img.save('RacetrackCoil.png')
@@ -552,7 +552,7 @@ def draw_RoundCoil():
         outer_radius=R_OUTER,
     )
 
-    app, view = obj.show()
+    view = obj.show(blocking=False)
 
     setup_scene(view)
     draw_coord_axes(view)
@@ -605,7 +605,7 @@ def draw_RoundCoil():
         label_alignment='right'
     )
 
-    view.show()
+    app = pg.mkQApp()
     app.processEvents()
     img = view.grabFramebuffer()
     img.save('RoundCoil.png')
@@ -616,7 +616,7 @@ def draw_Line():
 
     obj = Line(r_start=-LENGTH / 2 * Z, r_end=LENGTH / 2 * Z)
 
-    app, view = obj.show(surfaces=False, lines=True)
+    view = obj.show(surfaces=False, lines=True, blocking=False)
 
     setup_scene(view)
     draw_coord_axes(view)
@@ -637,7 +637,7 @@ def draw_Line():
     draw_point(view, -LENGTH / 2 * Z, "r_start")
     draw_point(view, LENGTH / 2 * Z, "r_end", label_pos='above')
 
-    view.show()
+    app = pg.mkQApp()
     app.processEvents()
     img = view.grabFramebuffer()
     img.save('Line.png')
@@ -656,7 +656,7 @@ def draw_Arc():
         swept_angle=SWEPT_ANGLE,
     )
 
-    app, view = obj.show(surfaces=False, lines=True)
+    view = obj.show(surfaces=False, lines=True, blocking=False)
 
     setup_scene(view)
     draw_coord_axes(view)
@@ -688,7 +688,7 @@ def draw_Arc():
         alignment='bottom',
     )
 
-    view.show()
+    app = pg.mkQApp()
     app.processEvents()
     img = view.grabFramebuffer()
     img.save('Arc.png')
@@ -703,16 +703,12 @@ def draw_Loop():
         radius=R,
     )
 
-    app, view = obj.show(surfaces=False, lines=True)
-
+    view = obj.show(surfaces=False, lines=True, blocking=False)
     setup_scene(view)
     draw_coord_axes(view)
 
     # Radius
-    # draw_sector(view, ORIGIN, R * X, Z, SWEPT_ANGLE, color=TICK_COLOR)
-
     R_END = R * X
-
     draw_length_indicator(
         view,
         ORIGIN,
@@ -726,16 +722,25 @@ def draw_Loop():
         # label_alignment='right'
     )
 
-    view.show()
+    app = pg.mkQApp()
     app.processEvents()
     img = view.grabFramebuffer()
     img.save('Loop.png')
 
 
-# draw_StraightSegment()
-# draw_RacetrackCoil()
-# draw_RoundCoil()
-# draw_CurvedSegment()
-# draw_Line()
-# draw_Arc()
-# draw_Loop()
+if __name__ == '__main__':
+    # Suppress spurious Qt warning:
+    import os
+    os.environ["QT_LOGGING_RULES"] = "qt.qpa.wayland.textinput=false"
+
+    draw_StraightSegment()
+    draw_RacetrackCoil()
+    draw_RoundCoil()
+    draw_CurvedSegment()
+    draw_Line()
+    draw_Arc()
+    draw_Loop()
+
+    # Blocking interactive mode:
+    # app = pg.mkQApp()
+    # app.exec()

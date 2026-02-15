@@ -25,6 +25,7 @@ from scipy.constants import mu_0
 import pyqtgraph as pg
 import pyqtgraph.opengl as gl
 from pyqtgraph.Qt import QtGui
+from pyqtgraph.Qt.QtCore import Qt
 
 #: Millimetres — multiply by this to convert mm to metres.
 mm = 1e-3
@@ -510,29 +511,40 @@ class CurrentObject(object):
     #     ax.set_box_aspect((asp_x, asp_y, asp_z))
     #     plt.show()
 
-    def show(self, surfaces=True, lines=False, line_width=5, color=COPPER):
+    def show(self, surfaces=True, lines=False, line_width=5, color=COPPER, blocking=True):
         """Open an interactive 3D pyqtgraph/OpenGL window displaying this object's
-        geometry. The window blocks until closed.
+        geometry.
 
         Args:
             surfaces (bool): Whether to render solid surfaces. Defaults to
                 ``True``.
-            lines (bool): Whether to render wire-frame lines. Defaults to
+            lines (bool): Whether to render current lines. Defaults to
                 ``False``.
             color (tuple): RGB colour as a 3-tuple of floats in ``[0, 1]``.
-                Defaults to :data:`COPPER`."""
+                Defaults to :data:`COPPER`.
+            blocking (bool): Whether to enter the Qt event loop, blocking
+                until the window is closed. Defaults to ``True``. To block
+                later, e.g. after adding additional items to the view or
+                creating multiple views, call ``app=pg.mkQApp(); app.exec()``.
+      
+        Returns:
+            pyqtgraph.opengl.GLViewWidget: The view widget.
+      """
         VIEW_WIDTH = 800
         VIEW_HEIGHT = 600
         VIEW_FOV = 5
 
         app = pg.mkQApp()
 
-        # antialiasing:
-        fmt = QtGui.QSurfaceFormat()
-        fmt.setSamples(16)
-        QtGui.QSurfaceFormat.setDefaultFormat(fmt)
+        # Share GL contexts - otherwise can't make multiple view widgets
+        app.setAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts)
 
         view = gl.GLViewWidget()
+
+        # Antialiasing:
+        fmt = QtGui.QSurfaceFormat()
+        fmt.setSamples(16)
+        view.setFormat(fmt)
 
         # Variable to store vertices for debugging
         all_verts = []
@@ -613,8 +625,11 @@ class CurrentObject(object):
         )
 
         view.show()
-        app.exec()
-        # return app, view
+
+        if blocking:
+            app.exec()
+
+        return view
     
     def __str__(self):
         return _formatobj(self, 'name')
