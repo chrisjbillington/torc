@@ -838,7 +838,7 @@ class Arc(Container):
         start of the arc, and swept_angle is the angle swept out from u. Current
         flows in the direction of increasing angle, which if swept_angle > 0, is
         in the positive (counterclockwise) sense with respect to n. The arc is
-        approximated as num_segs straight :class:`Line` segments.
+        approximated as ``num_segs`` straight :class:`Line` segments.
 
         Args:
             r0 (tuple or array-like): Centre position ``(x, y, z)`` (metres).
@@ -893,7 +893,7 @@ class RoundCoil(Container):
         """A round coil with rectangular cross-section.
 
         The coil is centred at r0 with normal vector n. Its finite cross-section is
-        approximated by distributing num_segs idealised :class:`Loop` elements
+        approximated by distributing ``num_segs`` idealised :class:`Loop` elements
         evenly through the rectangular cross-section.
 
         Args:
@@ -957,7 +957,7 @@ class StraightSegment(Container):
         The cross-section lies in the v-n plane: ``width`` is measured along v,
         ``height`` along n — consistent with the meaning of these dimensions in
         other classes. ``length`` is the extent along u. The finite cross-section
-        is approximated by distributing num_segs idealised :class:`Line` elements
+        is approximated by distributing ``num_segs`` idealised :class:`Line` elements
         evenly through the rectangular cross-section.
 
         Args:
@@ -1030,8 +1030,8 @@ class CurvedSegment(Container):
         swept out from u. Current flows in the direction of increasing angle,
         which if swept_angle > 0, is in the positive (counterclockwise) sense
         with respect to n. The finite cross-section is approximated by
-        distributing num_segs idealised :class:`Arc` elements evenly through the
-        rectangular cross-section, each itself approximated as num_arc_segs
+        distributing ``num_segs` idealised :class:`Arc` elements evenly through the
+        rectangular cross-section, each itself approximated as ``num_arc_segs``
         straight lines.
 
         Args:
@@ -1111,9 +1111,9 @@ class RacetrackCoil(Container):
         normal vector n. u defines the direction along which ``inner_length`` is
         measured (inner-surface to inner-surface); ``inner_width`` is measured
         along v. ``inner_length`` is conventionally the longest direction. The
-        finite cross-section is approximated by distributing num_segs idealised
+        finite cross-section is approximated by distributing ``num_segs`` idealised
         current elements evenly through the rectangular cross-section, and each
-        curved element is further approximated as num_arc_segs straight lines.
+        curved element is further approximated as ``num_arc_segs`` straight lines.
 
         Args:
             r0 (tuple or array-like): Centre position ``(x, y, z)`` (metres).
