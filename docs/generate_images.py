@@ -1,5 +1,12 @@
 import sys
-sys.path.insert(0, '..')
+from pathlib import Path
+
+THIS_DIR = Path(__file__).absolute().parent
+
+# Add project root to import path
+PROJECT_ROOT = THIS_DIR.parent
+if not PROJECT_ROOT in [Path(s).absolute() for s in sys.path]:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 from pyqtgraph.Qt.QtGui import QFont
 from pyqtgraph.Qt.QtCore import Qt
@@ -27,7 +34,7 @@ from torc import (
 ARROW_OFFSET = 0.05
 ARROW_HEAD_LENGTH = 0.125
 DISTANCE_LABEL_OFFSET = 0.25
-POINT_LABEL_OFFSET = 0.125
+POINT_LABEL_OFFSET = 0.05
 TICK_LENGTH = 0.25
 COORD_AXIS_SIZE = 0.5
 CURRENT_INDICATOR_OFFSET = 1
@@ -49,6 +56,13 @@ ORANGEYELLOW = pg.mkColor((255, 160, 0))
 
 AXIS_COLOR = pg.mkColor((0, 0, 0, 48))
 TICK_COLOR = BLACK
+
+
+def setup_view(view):
+    SCALE = 0.8
+    view.resize(int(round(SCALE*800)), int(round(SCALE*600)))
+    # view.resize(800, 600)
+    pass
 
 
 def rotate_vector(v, axis, angle):
@@ -293,7 +307,7 @@ def save_image(view, filename):
     app = pg.mkQApp()
     app.processEvents()
     img = view.grabFramebuffer()
-    img.save(filename)
+    img.save(str(THIS_DIR / '_static' / filename))
 
 
 def draw_StraightSegment():
@@ -317,6 +331,7 @@ def draw_StraightSegment():
     )
 
     view = obj.show(blocking=False)
+    setup_view(view)
     draw_coord_axes(view, y=None)
 
     WIDTH_GUIDELINE_START = -WIDTH / 2 * Y + HEIGHT / 2 * Z + LENGTH / 2 * X
@@ -396,6 +411,7 @@ def draw_CurvedSegment():
     )
 
     view = obj.show(blocking=False)
+    setup_view(view)
     draw_coord_axes(view, y=None)
 
     # height
@@ -493,6 +509,7 @@ def draw_RacetrackCoil():
     )
 
     view = obj.show(blocking=False)
+    setup_view(view)
     draw_coord_axes(view, y=None)
 
     # width
@@ -586,7 +603,7 @@ def draw_RacetrackCoil():
 
 
 def draw_RoundCoil():
-    HEIGHT = 1.75
+    HEIGHT = 2
     R_INNER = 3
     R_OUTER = 4.5
 
@@ -601,6 +618,7 @@ def draw_RoundCoil():
     )
 
     view = obj.show(blocking=False)
+    setup_view(view)
     draw_coord_axes(view, x=None, y=None)
 
     # height
@@ -668,6 +686,7 @@ def draw_Line():
     obj = Line(r_start=-LENGTH / 2 * Z, r_end=LENGTH / 2 * Z)
 
     view = obj.show(surfaces=False, lines=True, blocking=False)
+    setup_view(view)
     draw_coord_axes(view, x=None, y=None)
 
     # length
@@ -716,6 +735,7 @@ def draw_Arc():
     )
 
     view = obj.show(surfaces=False, lines=True, blocking=False)
+    setup_view(view)
     draw_coord_axes(view, y=None)
 
     # Radius
@@ -771,6 +791,7 @@ def draw_Loop():
     )
 
     view = obj.show(surfaces=False, lines=True, blocking=False)
+    setup_view(view)
     draw_coord_axes(view, x=None, y=None)
 
     # Radius
@@ -825,6 +846,7 @@ def draw_CoilPair():
     )
 
     view = obj.show(blocking=False)
+    setup_view(view)
     view.opts['distance'] *= 1.1  # zoom out a bit to fit current indicators
     draw_coord_axes(view, y=None)
 
@@ -837,7 +859,7 @@ def draw_CoilPair():
         SEP_BOT,
         SEP_TOP,
         n_tick=X,
-        tick_length=TICK_LENGTH,
+        tick_length=R_INNER + TICK_LENGTH,
         text='separation',
         color=BLUE,
     )

@@ -737,6 +737,9 @@ class Loop(CurrentObject):
         Current flows counterclockwise when viewed from the direction the normal
         vector n points.
 
+        .. image:: _static/Loop.png
+           :align: center
+
         Args:
             r0 (tuple or array-like): Centre position ``(x, y, z)`` (metres).
             n (tuple or array-like): Normal vector direction. Need not be
@@ -780,6 +783,9 @@ class Line(CurrentObject):
 
         Current flows from r_start to r_end. The object's centre (:attr:`r0`) is
         the midpoint of the wire. The local n axis points along the wire direction.
+
+        .. image:: _static/Line.png
+           :align: center
 
         Args:
             r_start (tuple or array-like): Start position ``(x, y, z)`` (metres).
@@ -840,6 +846,9 @@ class Arc(Container):
         in the positive (counterclockwise) sense with respect to n. The arc is
         approximated as ``num_segs`` straight :class:`Line` segments.
 
+        .. image:: _static/Arc.png
+           :align: center
+
         Args:
             r0 (tuple or array-like): Centre position ``(x, y, z)`` (metres).
             n (tuple or array-like): Normal vector direction. Need not be
@@ -895,6 +904,9 @@ class RoundCoil(Container):
         The coil is centred at r0 with normal vector n. Its finite cross-section is
         approximated by distributing ``num_segs`` idealised :class:`Loop` elements
         evenly through the rectangular cross-section.
+
+        .. image:: _static/RoundCoil.png
+           :align: center
 
         Args:
             r0 (tuple or array-like): Centre position ``(x, y, z)`` (metres).
@@ -959,6 +971,9 @@ class StraightSegment(Container):
         other classes. ``length`` is the extent along u. The finite cross-section
         is approximated by distributing ``num_segs`` idealised :class:`Line` elements
         evenly through the rectangular cross-section.
+
+        .. image:: _static/StraightSegment.png
+           :align: center
 
         Args:
             r0 (tuple or array-like): Centre position ``(x, y, z)`` (metres).
@@ -1033,6 +1048,9 @@ class CurvedSegment(Container):
         distributing ``num_segs` idealised :class:`Arc` elements evenly through the
         rectangular cross-section, each itself approximated as ``num_arc_segs``
         straight lines.
+
+        .. image:: _static/CurvedSegment.png
+           :align: center
 
         Args:
             r0 (tuple or array-like): Centre position ``(x, y, z)`` (metres).
@@ -1114,6 +1132,9 @@ class RacetrackCoil(Container):
         finite cross-section is approximated by distributing ``num_segs`` idealised
         current elements evenly through the rectangular cross-section, and each
         curved element is further approximated as ``num_arc_segs`` straight lines.
+
+        .. image:: _static/RacetrackCoil.png
+           :align: center
 
         Args:
             r0 (tuple or array-like): Centre position ``(x, y, z)`` (metres).
@@ -1217,6 +1238,9 @@ class CoilPair(Container):
         other at ``r0 - separation/2 * n``. In Helmholtz configuration both coils
         have the same normal; in anti-Helmholtz configuration the normals are
         opposite, producing a field gradient at the centre.
+
+        .. image:: _static/CoilPair.png
+           :align: center
 
         Args:
             coiltype (type): The coil class to instantiate (any class accepting r0
