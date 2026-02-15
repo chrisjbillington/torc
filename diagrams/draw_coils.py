@@ -41,18 +41,22 @@ WHITE = pg.mkColor((255, 255, 255))
 RED = pg.mkColor((255, 0, 0))
 GREEN = pg.mkColor((0, 160, 0))
 BLUE = pg.mkColor((0, 0, 255))
-PURPLE = pg.mkColor((192, 0, 192))
+PURPLE = pg.mkColor((128, 0, 160))
 
 
-AXIS_COLOR = pg.mkColor((148, 148, 148, 128))
 AXIS_COLOR = pg.mkColor((0, 0, 0, 48))
 TICK_COLOR = BLACK
 
 
+def rotate_vector(v, axis, angle):
+    """Rotate vector v by angle (radians) about axis using Rodrigues' formula."""
+    n = axis / np.linalg.norm(axis)
+    c, s = np.cos(angle), np.sin(angle)
+    return c * v + s * np.cross(n, v) + (1 - c) * np.dot(n, v) * n
+
+
 def setup_scene(view):
-    # view.setCameraParams(elevation=35.264, azimuth=-135)
-    # view.setBackgroundColor('lightgrey')
-    pass
+    draw_coord_axes(view)
 
 
 def draw_line(view, r_start, r_end, width=1, color=BLACK, always_on_top=True):
@@ -65,7 +69,6 @@ def draw_line(view, r_start, r_end, width=1, color=BLACK, always_on_top=True):
         pos=pos,
         color=color,
         width=width,
-        # mode='lines',
         antialias=True,
         **kwargs,
     )
@@ -82,15 +85,24 @@ def draw_arc(view, r0, r, n, theta, radii=False, width=1, color=BLACK):
         pos=pts,
         color=color,
         width=width,
-        # mode='lines',
         antialias=True,
-        # glOptions='translucent',
     )
     view.addItem(line)
 
     if radii:
         draw_line(view, r0, r0 + r, width=width, color=color)
         draw_line(view, r0, pts[-1], width=width, color=color)
+
+
+def draw_arrowhead(view, tip, direction, head_direction, width=2, color=BLACK):
+    """Draw an arrowhead at tip.
+
+    direction: unit vector pointing in the direction of arrow travel at the tip.
+    head_direction: vector perpendicular to travel direction; barbs spread along this.
+    """
+    h = head_direction / np.linalg.norm(head_direction)
+    draw_line(view, tip, tip - ARROW_HEAD_LENGTH * (direction + h / 2), width=width, color=color)
+    draw_line(view, tip, tip - ARROW_HEAD_LENGTH * (direction - h / 2), width=width, color=color)
 
 
 def draw_arc_arrow(view, r0, r, n, theta, head='end', width=2, color=BLACK):
@@ -107,19 +119,15 @@ def draw_arc_arrow(view, r0, r, n, theta, head='end', width=2, color=BLACK):
     if head in ['start', 'both']:
         p_start = r0 + r
         t = nxr / np.linalg.norm(nxr)
-        h = r / np.linalg.norm(r)  # radial (outward) at start
-        draw_line(view, p_start, p_start + ARROW_HEAD_LENGTH * (t + h / 2), width=width, color=color)
-        draw_line(view, p_start, p_start + ARROW_HEAD_LENGTH * (t - h / 2), width=width, color=color)
+        draw_arrowhead(view, p_start, -t, r, width=width, color=color)
 
     if head in ['end', 'both']:
-        c, s = np.cos(theta), np.sin(theta)
-        p_end = r0 + c * r + s * nxr + (1 - c) * np.dot(n_hat, r) * n_hat
-        t_unnorm = -s * r + c * nxr
-        t = t_unnorm / np.linalg.norm(t_unnorm)
+        p_end = r0 + rotate_vector(r, n_hat, theta)
+        t = rotate_vector(nxr, n_hat, theta)
+        t = t / np.linalg.norm(t)
         h = (p_end - r0)
-        h = h / np.linalg.norm(h)  # radial (outward) at end
-        draw_line(view, p_end, p_end - ARROW_HEAD_LENGTH * (t + h / 2), width=width, color=color)
-        draw_line(view, p_end, p_end - ARROW_HEAD_LENGTH * (t - h / 2), width=width, color=color)
+        h = h / np.linalg.norm(h)
+        draw_arrowhead(view, p_end, t, h, width=width, color=color)
 
 
 def draw_sector(view, r0, r, n, theta, width=1, color=BLACK):
@@ -128,18 +136,13 @@ def draw_sector(view, r0, r, n, theta, width=1, color=BLACK):
 
 def draw_arrow(view, r_start, r_end, head_direction, head='end', width=2, color=BLACK):
     assert head in ['start', 'end', 'both']
-    h = head_direction / np.linalg.norm(head_direction)
     r = r_end - r_start
     r /= np.linalg.norm(r)
     draw_line(view, r_start, r_end, width=width, color=color)
     if head in ['start', 'both']:
-        # start
-        draw_line(view, r_start, r_start + ARROW_HEAD_LENGTH * (r + h / 2), width=width, color=color)
-        draw_line(view, r_start, r_start + ARROW_HEAD_LENGTH * (r - h / 2), width=width, color=color)
+        draw_arrowhead(view, r_start, -r, head_direction, width=width, color=color)
     if head in ['end', 'both']:
-        # end
-        draw_line(view, r_end, r_end - ARROW_HEAD_LENGTH * (r + h / 2), width=width, color=color)
-        draw_line(view, r_end, r_end - ARROW_HEAD_LENGTH * (r - h / 2), width=width, color=color)
+        draw_arrowhead(view, r_end, r, head_direction, width=width, color=color)
 
 
 def draw_coord_axes(view):
@@ -270,6 +273,13 @@ def draw_length_indicator(
     )
 
 
+def save_image(view, filename):
+    app = pg.mkQApp()
+    app.processEvents()
+    img = view.grabFramebuffer()
+    img.save(filename)
+
+
 def draw_StraightSegment():
     LENGTH = 7
     WIDTH = 2.5
@@ -293,7 +303,6 @@ def draw_StraightSegment():
     view = obj.show(blocking=False)
 
     setup_scene(view)
-    draw_coord_axes(view)
 
     WIDTH_GUIDELINE_START = -WIDTH / 2 * Y + HEIGHT / 2 * Z + LENGTH / 2 * X
     WIDTH_GUIDELINE_END = WIDTH / 2 * Y + HEIGHT / 2 * Z + LENGTH / 2 * X
@@ -332,10 +341,7 @@ def draw_StraightSegment():
         color=BLUE,
     )
 
-    app = pg.mkQApp()
-    app.processEvents()
-    img = view.grabFramebuffer()
-    img.save('StraightSegment.png')
+    save_image(view, 'StraightSegment.png')
 
 
 def draw_CurvedSegment():
@@ -359,8 +365,6 @@ def draw_CurvedSegment():
     view = obj.show(blocking=False)
 
     setup_scene(view)
-    draw_coord_axes(view)
-
 
     # height
     HEIGHT_GUIDELINE_START = -HEIGHT / 2 * Z + R_OUTER * X
@@ -391,11 +395,8 @@ def draw_CurvedSegment():
         R_INNER_ARROW_END,
         n_tick=-Y,
         tick_length=TICK_LENGTH,
-        # n_tick=Y,
-        # tick_length=R_OUTER + TICK_LENGTH,
         text='inner_radius',
         color=PURPLE,
-        # label_alignment='right'
     )
 
     draw_length_indicator(
@@ -404,26 +405,25 @@ def draw_CurvedSegment():
         R_OUTER_ARROW_END,
         n_tick=-X,
         tick_length=TICK_LENGTH,
-        # n_tick=-X,
-        # tick_length=R_OUTER + TICK_LENGTH,
         text='outer_radius',
         color=PURPLE,
         label_alignment='right'
     )
 
     # swept angle
-    draw_arc_arrow(view, HEIGHT / 2 * Z, X, Z, SWEPT_ANGLE, color=BLACK)
+    SWEPT_ANGLE_ARC_RADIUS = 1
+    draw_arc_arrow(
+        view, HEIGHT / 2 * Z, SWEPT_ANGLE_ARC_RADIUS * X, Z, SWEPT_ANGLE, color=BLACK
+    )
     draw_label(
         view,
-        HEIGHT / 2 * Z + (1 + DISTANCE_LABEL_OFFSET) * (X + Y) / np.sqrt(2),
+        HEIGHT / 2 * Z
+        + (SWEPT_ANGLE_ARC_RADIUS + DISTANCE_LABEL_OFFSET) * (X + Y) / np.sqrt(2),
         "swept_angle",
         alignment='bottom',
     )
 
-    app = pg.mkQApp()
-    app.processEvents()
-    img = view.grabFramebuffer()
-    img.save('CurvedSegment.png')
+    save_image(view, 'CurvedSegment.png')
 
 
 def draw_RacetrackCoil():
@@ -450,7 +450,6 @@ def draw_RacetrackCoil():
     view = obj.show(blocking=False)
 
     setup_scene(view)
-    draw_coord_axes(view)
 
     # width
     WIDTH_GUIDELINE_START = -LENGTH / 2 * X + HEIGHT / 2 * Z - (WIDTH / 2 - R_INNER) * Y
@@ -511,11 +510,8 @@ def draw_RacetrackCoil():
         R_INNER_ARROW_END,
         n_tick=-Y,
         tick_length=TICK_LENGTH,
-        # n_tick=Y,
-        # tick_length=R_OUTER + TICK_LENGTH,
         text='inner_radius',
         color=PURPLE,
-        # label_alignment='right'
     )
 
     draw_length_indicator(
@@ -524,17 +520,11 @@ def draw_RacetrackCoil():
         R_OUTER_ARROW_END,
         n_tick=X,
         tick_length=TICK_LENGTH,
-        # n_tick=-X,
-        # tick_length=R_OUTER + TICK_LENGTH,
         text='outer_radius',
         color=PURPLE,
-        # label_alignment='right'
     )
 
-    app = pg.mkQApp()
-    app.processEvents()
-    img = view.grabFramebuffer()
-    img.save('RacetrackCoil.png')
+    save_image(view, 'RacetrackCoil.png')
 
 
 def draw_RoundCoil():
@@ -555,7 +545,6 @@ def draw_RoundCoil():
     view = obj.show(blocking=False)
 
     setup_scene(view)
-    draw_coord_axes(view)
 
     # height
     HEIGHT_GUIDELINE_START = -HEIGHT / 2 * Z - R_OUTER * X
@@ -584,11 +573,8 @@ def draw_RoundCoil():
         R_INNER_ARROW_END,
         n_tick=-Y,
         tick_length=TICK_LENGTH,
-        # n_tick=Y,
-        # tick_length=R_OUTER + TICK_LENGTH,
         text='inner_radius',
         color=PURPLE,
-        # label_alignment='right'
     )
 
     R_OUTER_ARROW_END = R_ARROWS_START + R_OUTER * Y
@@ -598,17 +584,12 @@ def draw_RoundCoil():
         R_OUTER_ARROW_END,
         n_tick=-X,
         tick_length=TICK_LENGTH,
-        # n_tick=-X,
-        # tick_length=R_OUTER + TICK_LENGTH,
         text='outer_radius',
         color=PURPLE,
         label_alignment='right'
     )
 
-    app = pg.mkQApp()
-    app.processEvents()
-    img = view.grabFramebuffer()
-    img.save('RoundCoil.png')
+    save_image(view, 'RoundCoil.png')
 
 
 def draw_Line():
@@ -619,7 +600,6 @@ def draw_Line():
     view = obj.show(surfaces=False, lines=True, blocking=False)
 
     setup_scene(view)
-    draw_coord_axes(view)
 
     # length
     LENGTH_GUIDELINE_START = -LENGTH / 2 * Z
@@ -637,16 +617,12 @@ def draw_Line():
     draw_point(view, -LENGTH / 2 * Z, "r_start")
     draw_point(view, LENGTH / 2 * Z, "r_end", label_pos='above')
 
-    app = pg.mkQApp()
-    app.processEvents()
-    img = view.grabFramebuffer()
-    img.save('Line.png')
+    save_image(view, 'Line.png')
 
 
 def draw_Arc():
     R = 4
     SWEPT_ANGLE = np.pi / 2
-
 
     obj = Arc(
         r0=ORIGIN,
@@ -659,7 +635,6 @@ def draw_Arc():
     view = obj.show(surfaces=False, lines=True, blocking=False)
 
     setup_scene(view)
-    draw_coord_axes(view)
 
     # Radius
     draw_sector(view, ORIGIN, R * X, Z, SWEPT_ANGLE, color=TICK_COLOR)
@@ -672,26 +647,23 @@ def draw_Arc():
         R_END,
         n_tick=-Y,
         tick_length=TICK_LENGTH,
-        # n_tick=Y,
-        # tick_length=R_OUTER + TICK_LENGTH,
         text='radius',
         color=PURPLE,
-        # label_alignment='right'
     )
 
     # swept angle
-    draw_arc_arrow(view, ORIGIN, X, Z, SWEPT_ANGLE, color=BLACK)
+    SWEPT_ANGLE_ARC_RADIUS = 1
+    draw_arc_arrow(
+        view, ORIGIN, SWEPT_ANGLE_ARC_RADIUS * X, Z, SWEPT_ANGLE, color=BLACK
+    )
     draw_label(
         view,
-        (1 + DISTANCE_LABEL_OFFSET) * (X + Y) / np.sqrt(2),
+        (SWEPT_ANGLE_ARC_RADIUS + DISTANCE_LABEL_OFFSET) * (X + Y) / np.sqrt(2),
         "swept_angle",
         alignment='bottom',
     )
 
-    app = pg.mkQApp()
-    app.processEvents()
-    img = view.grabFramebuffer()
-    img.save('Arc.png')
+    save_image(view, 'Arc.png')
 
 
 def draw_Loop():
@@ -705,7 +677,6 @@ def draw_Loop():
 
     view = obj.show(surfaces=False, lines=True, blocking=False)
     setup_scene(view)
-    draw_coord_axes(view)
 
     # Radius
     R_END = R * X
@@ -715,17 +686,11 @@ def draw_Loop():
         R_END,
         n_tick=-Y,
         tick_length=TICK_LENGTH,
-        # n_tick=Y,
-        # tick_length=R_OUTER + TICK_LENGTH,
         text='radius',
         color=PURPLE,
-        # label_alignment='right'
     )
 
-    app = pg.mkQApp()
-    app.processEvents()
-    img = view.grabFramebuffer()
-    img.save('Loop.png')
+    save_image(view, 'Loop.png')
 
 
 if __name__ == '__main__':
