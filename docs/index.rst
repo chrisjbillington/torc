@@ -10,18 +10,17 @@ torc |release|
     :local:
 
 
-``torc`` is a Python library for computing magnetic fields and gradients resulting
-from current-carrying coils — loops, straight wires, round coils and racetrack coils of
-rectangular cross-section — positioned and oriented arbitrarily in 3D space.
+``torc`` is a Python library for computing magnetic fields and gradients resulting from
+current-carrying objects (loops, straight wires, round coils and racetrack coils of
+rectangular cross-section) positioned and oriented arbitrarily in 3D space.
 
 Finite cross-section conductors are approximated by distributing multiple idealised 1D
-current elements through the cross-section.  Loop fields are computed analytically using
-complete elliptic integrals; straight wire fields use the Biot–Savart result for a
-finite wire; arcs and curved segments are approximated as sequences of straight
-segments.
+current elements through the cross-section. Loop fields are computed analytically using
+elliptic integrals; straight wire fields use the Biot–Savart result for a finite wire;
+arcs and curved segments are approximated as sequences of straight segments.
 
-All quantities are in SI units: positions in metres, currents in amps, and fields in
-tesla.
+All quantities are in SI units (metres, amps, tesla). Convenience constants for
+common unit conversions are included.
 
 `View on PyPI <https://pypi.org/project/torc/>`_
 | `View on GitHub <https://github.com/chrisjbillington/torc>`_
