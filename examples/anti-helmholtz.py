@@ -92,10 +92,10 @@ def plot_2d_field_and_gradient():
 def plot_1d_field_and_gradient():
     z = np.linspace(-10 * cm, 10 * cm, 1024)
 
-    # Compute B field on the z axis
+    # Compute B field on the z axis for current I = 1A 
     B = coils.B((0, 0, z), I=1)
 
-    # Compute z derivative of B on the z axis
+    # Compute z derivative of B on the z axis for current I = 1A 
     dB_dz = coils.dB((0, 0, z), s=Z, I=1)
 
     # Extract components:
