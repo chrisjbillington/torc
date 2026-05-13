@@ -647,12 +647,6 @@ class CurrentObject(object):
 
 
 class Container(CurrentObject):
-    """A group of :class:`CurrentObject` instances whose fields are summed.
-
-    Children can be passed at construction or added later with :meth:`add`.
-    Individual children can be accessed by integer index, slice, or by name
-    string."""
-
     def __init__(
         self,
         *children,
@@ -662,6 +656,13 @@ class Container(CurrentObject):
         num_turns=1,
         name=None,
     ):
+        """A group of :class:`CurrentObject` instances whose fields are summed.
+
+        Children can be passed at construction or added later with :meth:`add`. Individual
+        children can be accessed by integer index, slice, or by name string.
+
+        See :class:`CurrentObject` for inherited attributes and methods.
+        """
         super().__init__(
             r0=r0, n=n, u=u, num_turns=num_turns, name=name
         )
@@ -754,7 +755,10 @@ class Loop(CurrentObject):
                 normalised.
             radius (float): Radius of the loop (metres).
             num_turns (float): Overall current multiplier. Defaults to 1.
-            name (str, optional): Identifying name for :class:`Container` lookup."""
+            name (str, optional): Identifying name for :class:`Container` lookup.
+
+        See :class:`CurrentObject` for inherited attributes and methods.
+        """
         super().__init__(r0=r0, n=n, num_turns=num_turns, name=name)
         self.radius = radius
 
@@ -799,7 +803,10 @@ class Line(CurrentObject):
             r_start (tuple or array-like): Start position ``(x, y, z)`` (metres).
             r_end (tuple or array-like): End position ``(x, y, z)`` (metres).
             num_turns (float): Overall current multiplier. Defaults to 1.
-            name (str, optional): Identifying name for :class:`Container` lookup."""
+            name (str, optional): Identifying name for :class:`Container` lookup.
+        
+        See :class:`CurrentObject` for inherited attributes and methods.
+        """
         r_start = np.array(r_start, dtype=float)
         r_end = np.array(r_end, dtype=float)
         direction = r_end - r_start
@@ -868,7 +875,10 @@ class Arc(Container):
             num_turns (float): Overall current multiplier. Defaults to 1.
             num_segs (int): Number of straight line segments used to approximate
                 the arc. Defaults to 12.
-            name (str, optional): Identifying name for :class:`Container` lookup."""
+            name (str, optional): Identifying name for :class:`Container` lookup.
+
+        See :class:`CurrentObject` for inherited attributes and methods.
+        """
         super().__init__(r0=r0, n=n, u=u, num_turns=num_turns, name=name)
         self.radius = radius
         self.swept_angle = swept_angle
@@ -926,7 +936,10 @@ class RoundCoil(Container):
             num_turns (float): Overall current multiplier. Defaults to 1.
             num_segs (int): Number of :class:`Loop` elements used to approximate
                 the finite cross-section. Defaults to 12.
-            name (str, optional): Identifying name for :class:`Container` lookup."""
+            name (str, optional): Identifying name for :class:`Container` lookup.
+
+        See :class:`CurrentObject` for inherited attributes and methods.
+        """
         super().__init__(r0=r0, n=n, num_turns=num_turns, name=name)
         self.inner_radius = inner_radius
         self.outer_radius = outer_radius
@@ -995,7 +1008,10 @@ class StraightSegment(Container):
             num_turns (float): Overall current multiplier. Defaults to 1.
             num_segs (int): Number of :class:`Line` elements used to approximate
                 the finite cross-section. Defaults to 12.
-            name (str, optional): Identifying name for :class:`Container` lookup."""
+            name (str, optional): Identifying name for :class:`Container` lookup.
+
+        See :class:`CurrentObject` for inherited attributes and methods.
+        """
         super().__init__(r0=r0, n=n, u=u, num_turns=num_turns, name=name)
         self.length = length
         self.width = width
@@ -1076,7 +1092,10 @@ class CurvedSegment(Container):
                 the finite cross-section. Defaults to 12.
             num_arc_segs (int): Number of straight line segments per arc. Defaults
                 to 12.
-            name (str, optional): Identifying name for :class:`Container` lookup."""
+            name (str, optional): Identifying name for :class:`Container` lookup.
+
+        See :class:`CurrentObject` for inherited attributes and methods.
+        """
         super().__init__(r0=r0, n=n, u=u, num_turns=num_turns, name=name)
         self.inner_radius = inner_radius
         self.outer_radius = outer_radius
@@ -1165,7 +1184,10 @@ class RacetrackCoil(Container):
                 finite cross-section. Defaults to 12.
             num_arc_segs (int): Number of straight line segments per 90-degree
                 corner. Defaults to 12.
-            name (str, optional): Identifying name for :class:`Container` lookup."""
+            name (str, optional): Identifying name for :class:`Container` lookup.
+
+        See :class:`CurrentObject` for inherited attributes and methods.
+        """
 
         super().__init__(r0=r0, n=n, u=u, num_turns=num_turns, name=name)
         self.inner_length = inner_length
@@ -1268,7 +1290,10 @@ class CoilPair(Container):
                   case-insensitive) for same-direction normals, or ``-1``,
                   ``'anti-Helmholtz'`` (case-insensitive) for opposite normals.
                 * **name** (str, optional) — Identifying name for :class:`Container`
-                  lookup."""
+                  lookup.
+
+        See :class:`CurrentObject` for inherited attributes and methods.
+        """
         name = kwargs.pop('name', None)
         super().__init__(r0=r0, n=n, name=name)
         parity = kwargs.pop('parity', 'helmholtz')
