@@ -1,6 +1,12 @@
 # Path manipulation to ensure the example can run from the project directory:
 import sys
-import pathlib
+from pathlib import Path
+THIS_DIR = Path(__file__).absolute().parent
+
+PROJECT_ROOT = THIS_DIR.parent
+if PROJECT_ROOT not in [Path(s).absolute() for s in sys.path]:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 
 from torc import (
     RacetrackCoil,
@@ -12,7 +18,6 @@ from torc import (
     X,
     Y,
     Z,
-    SILVER,
     COPPER,
 )
 import numpy as np

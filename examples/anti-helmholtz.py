@@ -1,58 +1,11 @@
-# torc
+# Path manipulation to ensure the example can run from the project directory:
+import sys
+from pathlib import Path
+THIS_DIR = Path(__file__).absolute().parent
+PROJECT_ROOT = THIS_DIR.parent
+if PROJECT_ROOT not in [Path(s).absolute() for s in sys.path]:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
-`torc` is a Python library for computing magnetic fields and gradients from
-current-carrying coils — loops, straight wires, round coils, and racetrack coils of
-rectangular cross-section — positioned and oriented arbitrarily in 3D space.
-
-Finite cross-section conductors are approximated by distributing multiple idealised
-1D current elements through the cross-section. Loop fields are computed analytically
-using complete elliptic integrals; straight wire fields use the Biot–Savart result
-for a finite wire; arcs and curved segments are approximated as sequences of straight
-segments.
-
-All quantities are in SI units (metres, amps, tesla). Convenience constants for
-common unit conversions are included.
-
-**[Read the docs on ReadTheDocs](https://python-torc.readthedocs.io)**
-| [PyPI](https://pypi.org/project/torc/)
-| [GitHub](https://github.com/chrisjbillington/torc)
-
-## Installation
-
-```bash
-pip install torc
-```
-
-## API overview
-
-| Class | Description |
-|---|---|
-| `Loop` | Ideal current loop (thin wire) |
-| `Line` | Finite straight wire |
-| `Arc` | Circular arc segment |
-| `RoundCoil` | Cylindrical coil with rectangular cross-section |
-| `RacetrackCoil` | Racetrack-shaped coil with rectangular cross-section |
-| `StraightSegment` | Straight bus-bar segment |
-| `CurvedSegment` | Curved bus-bar segment |
-| `CoilPair` | Symmetric Helmholtz or anti-Helmholtz pair of any coil type |
-| `Container` | Named collection of coils; sums fields from all children |
-
-All objects expose `.B(r, I)` for the field vector at position `r` and `.dB(r, I, s)`
-for the directional derivative along `s`. Positions vectors `r` can be arrays with first
-dimension of lenfth 3 (for x, y, and z) and arbitary other dimensions, or can be
-3-tuples (x,y,z) where x,y, and z are numpy arrays that will be subject to broadcasting,
-for evaluating fields over grids.
-
-## Examples
-
-### Anti-Helmholtz coilpair
-
-This example shows constructing a coilpair in anti-Helmholtz configuration, and
-evaluating and plotting fields and gradients along lines and on a grid.
-
-![Plots of calculated fields for anti-Helmholtz coils](examples/anti-helmholtz-plots.png)
-
-```python
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -173,13 +126,3 @@ plt.show()
 
 # Display a 3D rendering of the coils:
 coils.show()
-```
-
-### Multi-coil transport assembly
-
-`torc` can model assemblies of many coils. The example shown below, the code for which
-is in `examples/transport-assembly.py` constructs an assembly of coils for magnetic
-transport in a cold-atom experiment:
-
-![3D rendering of transport coil assembly](examples/transport-assembly.png)
-
